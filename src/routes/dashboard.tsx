@@ -345,10 +345,8 @@ function DashboardPage() {
                 </CardContent>
               </Card>
             </section>
-          </main>
-        </div>
-      </div>
-    </div>
+    </AppShell>
+
   );
 }
 
