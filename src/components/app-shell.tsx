@@ -1,0 +1,132 @@
+import { useState, type ReactNode } from "react";
+import { Link } from "@tanstack/react-router";
+import {
+  ArrowDownRight,
+  Bell,
+  CalendarClock,
+  CreditCard,
+  LayoutDashboard,
+  LineChart,
+  Menu,
+  Search,
+  Settings,
+  Sparkles,
+  Target,
+  TrendingUp,
+  Wallet,
+} from "lucide-react";
+
+import { BrandLockup, BrandMark } from "@/components/brand";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+
+const nav = [
+  { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" as const },
+  { label: "Receitas", icon: TrendingUp, to: "/receitas" as const },
+  { label: "Despesas", icon: ArrowDownRight, to: "/despesas" as const },
+  { label: "Contas", icon: Wallet },
+  { label: "Cartões", icon: CreditCard },
+  { label: "Investimentos", icon: LineChart },
+  { label: "Metas", icon: Target },
+  { label: "Relatórios", icon: CalendarClock },
+  { label: "Certo IA", icon: Sparkles },
+  { label: "Configurações", icon: Settings },
+];
+
+const itemBase =
+  "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors";
+const inactive =
+  "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+const active = "bg-sidebar-accent text-sidebar-primary";
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  return (
+    <div className="min-h-dvh bg-background">
+      <div className="flex">
+        <aside
+          className={cn(
+            "sticky top-0 hidden h-dvh shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 transition-[width] duration-300 lg:flex",
+            sidebarOpen ? "w-64" : "w-20",
+          )}
+        >
+          <div className="mb-8 flex items-center px-1">
+            {sidebarOpen ? <BrandLockup /> : <BrandMark />}
+          </div>
+          <nav className="flex-1 space-y-1" aria-label="Navegação principal">
+            {nav.map((item) =>
+              item.to ? (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  className={cn(itemBase, inactive)}
+                  activeProps={{ className: cn(itemBase, active) }}
+                >
+                  <item.icon className="size-5 shrink-0" aria-hidden="true" />
+                  {sidebarOpen && <span className="truncate">{item.label}</span>}
+                </Link>
+              ) : (
+                <button key={item.label} type="button" className={cn(itemBase, inactive)}>
+                  <item.icon className="size-5 shrink-0" aria-hidden="true" />
+                  {sidebarOpen && <span className="truncate">{item.label}</span>}
+                </button>
+              ),
+            )}
+          </nav>
+          <Link
+            to="/"
+            className="mt-4 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+          >
+            {sidebarOpen ? "Sair da conta" : "←"}
+          </Link>
+        </aside>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <header className="glass sticky top-0 z-20 flex items-center gap-3 px-4 py-3 sm:px-6">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-xl"
+              aria-label="Recolher menu"
+              onClick={() => setSidebarOpen((v) => !v)}
+            >
+              <Menu className="size-5" />
+            </Button>
+            <div className="relative hidden flex-1 sm:block">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+              />
+              <input
+                type="search"
+                placeholder="Buscar lançamentos, metas, cartões..."
+                aria-label="Buscar"
+                className="h-10 w-full rounded-xl border border-input bg-surface pl-10 pr-4 text-sm outline-none transition-shadow focus:ring-2 focus:ring-ring/40"
+              />
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="rounded-xl" aria-label="Notificações">
+                <Bell className="size-5" />
+              </Button>
+              <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5">
+                <span className="grid size-8 place-items-center rounded-lg bg-gradient-brand text-xs font-semibold text-primary-foreground">
+                  MC
+                </span>
+                <div className="hidden text-left sm:block">
+                  <p className="text-sm font-medium leading-none">Marina Costa</p>
+                  <p className="text-xs text-muted-foreground">Plano Premium</p>
+                </div>
+              </div>
+            </div>
+          </header>
+
+          <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">{children}</main>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export const brl = (value: number) =>
+  value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
