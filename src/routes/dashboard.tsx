@@ -1,5 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 import {
   Area,
   AreaChart,
@@ -17,22 +16,15 @@ import {
 import {
   ArrowDownRight,
   ArrowUpRight,
-  Bell,
   CalendarClock,
   CreditCard,
-  LayoutDashboard,
-  LineChart,
-  Menu,
   PiggyBank,
-  Search,
-  Settings,
   Sparkles,
-  Target,
   TrendingUp,
   Wallet,
 } from "lucide-react";
 
-import { BrandLockup, BrandMark } from "@/components/brand";
+import { AppShell, brl } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -57,21 +49,6 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
 });
 
-const brl = (value: number) =>
-  value.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-
-const nav = [
-  { label: "Dashboard", icon: LayoutDashboard, active: true },
-  { label: "Receitas", icon: TrendingUp },
-  { label: "Despesas", icon: ArrowDownRight },
-  { label: "Contas", icon: Wallet },
-  { label: "Cartões", icon: CreditCard },
-  { label: "Investimentos", icon: LineChart },
-  { label: "Metas", icon: Target },
-  { label: "Relatórios", icon: CalendarClock },
-  { label: "Certo IA", icon: Sparkles },
-  { label: "Configurações", icon: Settings },
-];
 
 const cashFlow = [
   { mes: "Mar", receitas: 9200, despesas: 6100 },
