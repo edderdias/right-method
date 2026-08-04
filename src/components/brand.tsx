@@ -20,7 +20,7 @@ export function BrandLockup({ className }: { className?: string }) {
         <p className="text-base font-semibold tracking-tight">
           <span className="text-primary">Método</span> <span className="text-info">Certo</span>
         </p>
-        <p className="text-[11px] uppercase tracking-widest text-muted-foreground">
+        <p className="whitespace-nowrap text-[10px] uppercase tracking-widest text-muted-foreground">
           Suas finanças, seu futuro
         </p>
       </div>

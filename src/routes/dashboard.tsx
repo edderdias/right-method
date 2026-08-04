@@ -199,7 +199,7 @@ function DashboardPage() {
 
           <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">
             <div>
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Olá, Marina 👋</h1>
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Olá, Marina</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 Aqui está o resumo das suas finanças em agosto.
               </p>
