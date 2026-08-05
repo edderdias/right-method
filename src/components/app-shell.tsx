@@ -24,10 +24,11 @@ const nav = [
   { label: "Dashboard", icon: LayoutDashboard, to: "/dashboard" as const },
   { label: "Receitas", icon: TrendingUp, to: "/receitas" as const },
   { label: "Despesas", icon: ArrowDownRight, to: "/despesas" as const },
-  { label: "Contas", icon: Wallet },
+  { label: "Contas", icon: Wallet, to: "/contas" as const },
   { label: "Cartões", icon: CreditCard, to: "/cartoes" as const },
   { label: "Investimentos", icon: LineChart, to: "/investimentos" as const },
-  { label: "Metas", icon: Target },
+  { label: "Metas", icon: Target, to: "/metas" as const },
+
   { label: "Relatórios", icon: CalendarClock },
   { label: "Certo IA", icon: Sparkles },
   { label: "Configurações", icon: Settings },
