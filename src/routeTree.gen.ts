@@ -10,13 +10,20 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CartoesRouteImport } from './routes/cartoes'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DespesasRouteImport } from './routes/despesas'
+import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as ReceitasRouteImport } from './routes/receitas'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CartoesRoute = CartoesRouteImport.update({
+  id: '/cartoes',
+  path: '/cartoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -29,6 +36,11 @@ const DespesasRoute = DespesasRouteImport.update({
   path: '/despesas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InvestimentosRoute = InvestimentosRouteImport.update({
+  id: '/investimentos',
+  path: '/investimentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReceitasRoute = ReceitasRouteImport.update({
   id: '/receitas',
   path: '/receitas',
@@ -37,35 +49,62 @@ const ReceitasRoute = ReceitasRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cartoes': typeof CartoesRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/investimentos': typeof InvestimentosRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cartoes': typeof CartoesRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/investimentos': typeof InvestimentosRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cartoes': typeof CartoesRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/investimentos': typeof InvestimentosRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/dashboard' | '/despesas' | '/receitas'
+  fullPaths:
+    | '/'
+    | '/cartoes'
+    | '/dashboard'
+    | '/despesas'
+    | '/investimentos'
+    | '/receitas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/dashboard' | '/despesas' | '/receitas'
-  id: '__root__' | '/' | '/dashboard' | '/despesas' | '/receitas'
+  to:
+    | '/'
+    | '/cartoes'
+    | '/dashboard'
+    | '/despesas'
+    | '/investimentos'
+    | '/receitas'
+  id:
+    | '__root__'
+    | '/'
+    | '/cartoes'
+    | '/dashboard'
+    | '/despesas'
+    | '/investimentos'
+    | '/receitas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CartoesRoute: typeof CartoesRoute
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
+  InvestimentosRoute: typeof InvestimentosRoute
   ReceitasRoute: typeof ReceitasRoute
 }
 
@@ -76,6 +115,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cartoes': {
+      id: '/cartoes'
+      path: '/cartoes'
+      fullPath: '/cartoes'
+      preLoaderRoute: typeof CartoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -92,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DespesasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/investimentos': {
+      id: '/investimentos'
+      path: '/investimentos'
+      fullPath: '/investimentos'
+      preLoaderRoute: typeof InvestimentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/receitas': {
       id: '/receitas'
       path: '/receitas'
@@ -104,8 +157,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CartoesRoute: CartoesRoute,
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
+  InvestimentosRoute: InvestimentosRoute,
   ReceitasRoute: ReceitasRoute,
 }
 export const routeTree = rootRouteImport
