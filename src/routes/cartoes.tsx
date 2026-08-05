@@ -102,7 +102,7 @@ const lancamentos: Record<string, { desc: string; cat: string; data: string; val
 };
 
 function CartoesPage() {
-  const [selecionado, setSelecionado] = useState(cartoes[0].id);
+  const [selecionado, setSelecionado] = useState(cartoes[0]!.id);
   const cartao = useMemo(() => cartoes.find((c) => c.id === selecionado)!, [selecionado]);
 
   const totalFatura = cartoes.reduce((s, c) => s + c.fatura, 0);
@@ -233,7 +233,7 @@ function CartoesPage() {
               </span>
             </CardHeader>
             <CardContent className="space-y-3">
-              {lancamentos[cartao.id].map((l) => (
+              {lancamentos[cartao.id]!.map((l) => (
                 <div
                   key={l.desc}
                   className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3"
