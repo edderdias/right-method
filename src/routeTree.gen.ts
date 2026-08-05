@@ -15,6 +15,7 @@ import { Route as ContasRouteImport } from './routes/contas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as InvestimentosRouteImport } from './routes/investimentos'
+import { Route as MetasRouteImport } from './routes/metas'
 import { Route as ReceitasRouteImport } from './routes/receitas'
 
 const IndexRoute = IndexRouteImport.update({
@@ -47,6 +48,11 @@ const InvestimentosRoute = InvestimentosRouteImport.update({
   path: '/investimentos',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MetasRoute = MetasRouteImport.update({
+  id: '/metas',
+  path: '/metas',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReceitasRoute = ReceitasRouteImport.update({
   id: '/receitas',
   path: '/receitas',
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
+  '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
+  '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
+  '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/despesas'
     | '/investimentos'
+    | '/metas'
     | '/receitas'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/despesas'
     | '/investimentos'
+    | '/metas'
     | '/receitas'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/despesas'
     | '/investimentos'
+    | '/metas'
     | '/receitas'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
   InvestimentosRoute: typeof InvestimentosRoute
+  MetasRoute: typeof MetasRoute
   ReceitasRoute: typeof ReceitasRoute
 }
 
@@ -165,6 +178,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof InvestimentosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/metas': {
+      id: '/metas'
+      path: '/metas'
+      fullPath: '/metas'
+      preLoaderRoute: typeof MetasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/receitas': {
       id: '/receitas'
       path: '/receitas'
@@ -182,18 +202,9 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
   InvestimentosRoute: InvestimentosRoute,
+  MetasRoute: MetasRoute,
   ReceitasRoute: ReceitasRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
