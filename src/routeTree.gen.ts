@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as CartoesRouteImport } from './routes/cartoes'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DespesasRouteImport } from './routes/despesas'
+import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as ReceitasRouteImport } from './routes/receitas'
 
 const IndexRoute = IndexRouteImport.update({
@@ -35,6 +36,11 @@ const DespesasRoute = DespesasRouteImport.update({
   path: '/despesas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const InvestimentosRoute = InvestimentosRouteImport.update({
+  id: '/investimentos',
+  path: '/investimentos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReceitasRoute = ReceitasRouteImport.update({
   id: '/receitas',
   path: '/receitas',
@@ -46,6 +52,7 @@ export interface FileRoutesByFullPath {
   '/cartoes': typeof CartoesRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/investimentos': typeof InvestimentosRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +60,7 @@ export interface FileRoutesByTo {
   '/cartoes': typeof CartoesRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/investimentos': typeof InvestimentosRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRoutesById {
@@ -61,14 +69,34 @@ export interface FileRoutesById {
   '/cartoes': typeof CartoesRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
+  '/investimentos': typeof InvestimentosRoute
   '/receitas': typeof ReceitasRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/cartoes' | '/dashboard' | '/despesas' | '/receitas'
+  fullPaths:
+    | '/'
+    | '/cartoes'
+    | '/dashboard'
+    | '/despesas'
+    | '/investimentos'
+    | '/receitas'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/cartoes' | '/dashboard' | '/despesas' | '/receitas'
-  id: '__root__' | '/' | '/cartoes' | '/dashboard' | '/despesas' | '/receitas'
+  to:
+    | '/'
+    | '/cartoes'
+    | '/dashboard'
+    | '/despesas'
+    | '/investimentos'
+    | '/receitas'
+  id:
+    | '__root__'
+    | '/'
+    | '/cartoes'
+    | '/dashboard'
+    | '/despesas'
+    | '/investimentos'
+    | '/receitas'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +104,7 @@ export interface RootRouteChildren {
   CartoesRoute: typeof CartoesRoute
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
+  InvestimentosRoute: typeof InvestimentosRoute
   ReceitasRoute: typeof ReceitasRoute
 }
 
@@ -109,6 +138,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DespesasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/investimentos': {
+      id: '/investimentos'
+      path: '/investimentos'
+      fullPath: '/investimentos'
+      preLoaderRoute: typeof InvestimentosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/receitas': {
       id: '/receitas'
       path: '/receitas'
@@ -124,6 +160,7 @@ const rootRouteChildren: RootRouteChildren = {
   CartoesRoute: CartoesRoute,
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
+  InvestimentosRoute: InvestimentosRoute,
   ReceitasRoute: ReceitasRoute,
 }
 export const routeTree = rootRouteImport
