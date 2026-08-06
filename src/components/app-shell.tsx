@@ -29,9 +29,9 @@ const nav = [
   { label: "Investimentos", icon: LineChart, to: "/investimentos" as const },
   { label: "Metas", icon: Target, to: "/metas" as const },
 
-  { label: "Relatórios", icon: CalendarClock },
-  { label: "Certo IA", icon: Sparkles },
-  { label: "Configurações", icon: Settings },
+  { label: "Relatórios", icon: CalendarClock, to: "/relatorios" as const },
+  { label: "Certo IA", icon: Sparkles, to: "/certo-ia" as const },
+  { label: "Configurações", icon: Settings, to: "/configuracoes" as const },
 ];
 
 const itemBase =
