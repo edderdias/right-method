@@ -1,602 +1,81 @@
-# Método Certo: Personal Finance, Simplified
+# Método Certo
 
-Prompt de Desenvolvimento – Método Certo (PWA)
+O **Método Certo** é uma plataforma de gestão financeira pessoal desenvolvida para ajudar pessoas a organizarem sua vida financeira de forma prática, intuitiva e eficiente. O sistema reúne ferramentas para controle de receitas e despesas, planejamento financeiro, acompanhamento de metas, gerenciamento de investimentos e análise detalhada da saúde financeira.
 
-Visão Geral
+Desenvolvido como um **Progressive Web App (PWA)**, o Método Certo oferece uma experiência semelhante à de um aplicativo nativo, permitindo instalação em dispositivos móveis e desktops, funcionamento responsivo e recursos como notificações e acesso otimizado para diferentes plataformas.
 
-Desenvolva um sistema web moderno chamado Método Certo, um Progressive Web App (PWA) para controle financeiro pessoal inteligente.
+## Objetivos
 
-O sistema deverá possuir aparência semelhante a uma aplicação nativa (mobile-first), podendo ser instalado no Android, iPhone, Windows e macOS através do navegador.
+O principal objetivo do projeto é fornecer uma solução completa para o gerenciamento financeiro pessoal, permitindo que o usuário tenha maior controle sobre seus gastos, acompanhe sua evolução patrimonial e tome decisões mais conscientes com base em informações organizadas e análises inteligentes.
 
-O objetivo é fornecer ao usuário uma plataforma completa para gerenciamento financeiro, planejamento de metas, investimentos e análises inteligentes utilizando Inteligência Artificial.
+## Principais Funcionalidades
 
-Tecnologias
+* Controle de receitas e despesas;
+* Contas a pagar e contas a receber;
+* Cadastro e gerenciamento de contas bancárias;
+* Controle de cartões de crédito;
+* Organização por categorias e subcategorias;
+* Criação e acompanhamento de metas financeiras;
+* Gestão de investimentos;
+* Dashboards interativos com indicadores financeiros;
+* Gráficos e relatórios detalhados;
+* Alertas de vencimentos e notificações;
+* Integração com Open Finance (quando disponível);
+* Assistente financeiro inteligente para recomendações e previsões;
+* Exportação de relatórios em diferentes formatos;
+* Modo claro e escuro;
+* Interface responsiva para desktop, tablet e smartphone.
 
-Utilize a seguinte stack:
+## Tecnologias
 
-Front-end
+O projeto foi desenvolvido utilizando tecnologias modernas voltadas para desempenho, escalabilidade e facilidade de manutenção.
 
-React 19
+### Front-end
 
-TypeScript
+* React
+* TypeScript
+* Vite
+* Tailwind CSS
+* Shadcn/UI
+* React Router
+* TanStack Query
+* React Hook Form
+* Zod
+* Framer Motion
+* Recharts
 
-Vite
+### Back-end
 
-React Router
+* Node.js
+* NestJS
+* PostgreSQL
+* Prisma ORM
+* Redis
+* JWT
 
-Tailwind CSS
+## Arquitetura
 
-Shadcn/UI
+A aplicação foi estruturada seguindo boas práticas de desenvolvimento, priorizando:
 
-Framer Motion
+* Clean Architecture;
+* SOLID;
+* Componentização;
+* Reutilização de código;
+* Separação de responsabilidades;
+* Escalabilidade;
+* Segurança;
+* Alto desempenho.
 
-Recharts
+## Diferenciais
 
-React Query (TanStack Query)
+O Método Certo vai além do controle financeiro tradicional, oferecendo uma experiência moderna e centralizada para administração das finanças pessoais. A plataforma combina organização, automação e inteligência para auxiliar o usuário no planejamento financeiro, no acompanhamento de metas e na tomada de decisões com base em indicadores e análises personalizadas.
 
-React Hook Form
+## Status do Projeto
 
-Zod
+🚧 Em desenvolvimento.
 
-Axios
+Novas funcionalidades, melhorias de desempenho e integrações estão sendo implementadas continuamente para oferecer uma experiência cada vez mais completa e confiável.
 
-PWA (Vite Plugin PWA)
+## Licença
 
-Back-end
-
-Node.js
-
-NestJS
-
-PostgreSQL
-
-Prisma ORM
-
-JWT
-
-Redis
-
-BullMQ
-
-Firebase Cloud Messaging
-
-OpenAI API
-
-Características do PWA
-
-O sistema deve funcionar como aplicativo instalado.
-
-Implementar:
-
-Instalação no Android e iPhone
-
-Funcionamento Offline
-
-Cache Inteligente
-
-Atualizações automáticas
-
-Splash Screen
-
-Manifest.json
-
-Ícones em vários tamanhos
-
-Push Notifications
-
-Background Sync
-
-Service Worker
-
-Design
-
-Inspirado em:
-
-Nubank
-
-Inter
-
-Notion
-
-Linear
-
-Stripe Dashboard
-
-Visual moderno.
-
-Minimalista.
-
-Muito fluido.
-
-Animações suaves.
-
-Glassmorphism leve.
-
-Cards arredondados.
-
-Bordas suaves.
-
-Muito espaço entre elementos.
-
-Identidade Visual
-
-Nome:
-
-Método Certo
-
-Slogan:
-
-Suas finanças, seu futuro.
-
-Paleta
-
-Primária
-
-Verde
-
-#2ECC71
-
-
-Secundária
-
-Azul
-
-#1565C0
-
-
-Apoio
-
-Laranja
-
-#FF9800
-
-
-Fundos
-
-#FFFFFF
-#F5F7FA
-#EEF2F6
-
-
-Texto
-
-#1E293B
-#64748B
-
-
-Ícones
-
-Seguir o mesmo padrão criado para o aplicativo.
-
-Utilizar ícones outline modernos.
-
-Exemplos:
-
-Carteira
-
-Crescimento financeiro
-
-Gráfico
-
-Cofre
-
-Investimentos
-
-Cartão
-
-PIX
-
-Banco
-
-Calendário
-
-Relatórios
-
-IA
-
-Metas
-
-Economia
-
-Configurações
-
-Tipografia
-
-Fonte
-
-Inter
-
-Pesos
-
-300
-
-400
-
-500
-
-600
-
-700
-
-Layout
-
-Sidebar recolhível
-
-Header fixo
-
-Conteúdo central
-
-Responsivo
-
-Dark Mode
-
-Light Mode
-
-Estrutura das páginas
-
-Login
-
-Tela moderna com:
-
-Logo
-
-Nome
-
-Imagem ilustrativa financeira
-
-Login
-
-Senha
-
-Lembrar acesso
-
-Entrar
-
-Google
-
-Apple
-
-Esqueci senha
-
-Cadastrar
-
-Dashboard
-
-Mostrar:
-
-Saldo Atual
-
-Receitas
-
-Despesas
-
-Patrimônio
-
-Investimentos
-
-Fluxo de Caixa
-
-Metas
-
-Contas vencendo
-
-Cartões
-
-Resumo da IA
-
-Receitas
-
-Cadastro
-
-Categorias
-
-Filtros
-
-Pesquisa
-
-Anexos
-
-Recorrência
-
-Despesas
-
-Cadastro
-
-Parcelamentos
-
-Recorrência
-
-Categoria
-
-Centro de custo
-
-Comprovantes
-
-Status
-
-Contas Bancárias
-
-Saldo
-
-Extrato
-
-Transferências
-
-Open Finance
-
-PIX
-
-Cartões
-
-Limite
-
-Disponível
-
-Faturas
-
-Parcelas
-
-Gráfico de utilização
-
-Investimentos
-
-Tesouro
-
-CDB
-
-LCI
-
-LCA
-
-Fundos
-
-ETF
-
-Ações
-
-FII
-
-Cripto
-
-Dividendos
-
-Rentabilidade
-
-Patrimônio
-
-Metas
-
-Criar metas
-
-Valor
-
-Prazo
-
-Economia mensal
-
-Barra de progresso
-
-Simulações
-
-Relatórios
-
-Mensal
-
-Anual
-
-Categorias
-
-Comparativos
-
-Exportar
-
-PDF
-
-Excel
-
-CSV
-
-Inteligência Artificial
-
-Criar um assistente chamado
-
-Certo IA
-
-Chat semelhante ao ChatGPT.
-
-Perguntas:
-
-Quanto posso gastar?
-
-Estou economizando?
-
-Como investir?
-
-Quais gastos cortar?
-
-Quanto sobra este mês?
-
-Qual minha previsão?
-
-Como melhorar minhas finanças?
-
-A IA deverá:
-
-Analisar histórico.
-
-Identificar padrões.
-
-Detectar desperdícios.
-
-Gerar previsões.
-
-Criar planejamentos.
-
-Gerar insights automaticamente.
-
-Dashboard Inteligente
-
-A IA gera automaticamente cards como:
-
-"Você gastou 14% mais em alimentação."
-
-"Sua energia aumentou."
-
-"Você pode economizar R$ 280."
-
-"Seu patrimônio cresceu 4%."
-
-"Você está próximo da meta."
-
-Open Finance
-
-Integração completa.
-
-Sincronizar:
-
-Bancos
-
-PIX
-
-Cartões
-
-Investimentos
-
-Empréstimos
-
-Financiamentos
-
-Extratos
-
-Notificações
-
-Push
-
-Toast
-
-Email
-
-Alertas para:
-
-Conta vencendo
-
-Cartão
-
-Meta
-
-Investimento
-
-Recebimento
-
-Saldo baixo
-
-Segurança
-
-JWT
-
-Refresh Token
-
-Biometria (WebAuthn quando suportado)
-
-2FA
-
-HTTPS
-
-LGPD
-
-Criptografia
-
-Logs
-
-Auditoria
-
-Dashboard Administrativo
-
-Usuários
-
-Planos
-
-Assinaturas
-
-Financeiro
-
-Logs
-
-Analytics
-
-Configurações
-
-Monitoramento
-
-Performance
-
-Lazy Loading
-
-Code Splitting
-
-React Query Cache
-
-Virtualização de listas
-
-Otimização de imagens
-
-Compressão
-
-SEO
-
-Lighthouse acima de 95
-
-Acessibilidade
-
-Seguir WCAG 2.2 AA
-
-Suporte a teclado
-
-Alto contraste
-
-ARIA
-
-Responsividade completa
-
-Diferenciais
-
-Instalação como aplicativo (PWA).
-
-Funcionamento offline para consultas e lançamentos locais, sincronizando automaticamente quando houver conexão.
-
-Inteligência Artificial integrada para análise financeira personalizada.
-
-Integração com Open Finance.
-
-Dashboard moderno e altamente interativo.
-
-Animações suaves com excelente desempenho.
-
-Interface premium inspirada nos melhores produtos financeiros do mercado.
-
-Objetivo Final
-
-Criar um Progressive Web App (PWA) moderno, rápido e seguro, com experiência equivalente a um aplicativo nativo. O Método Certo deve atuar como um consultor financeiro inteligente, ajudando os usuários a controlar receitas e despesas, acompanhar investimentos, atingir metas financeiras e tomar decisões mais assertivas por meio de Inteligência Artificial.
-
-O sistema deve ser desenvolvido seguindo princípios de Clean Architecture, Componentização, Design System, SOLID, Clean Code, Testes Automatizados (unitários e de integração) e documentação clara, permitindo evolução contínua, alta escalabilidade e facilidade de manutenção.
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/49fca9a0-f6df-4f94-b252-7cd203e6be41).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+Este projeto está licenciado sob a licença MIT. Consulte o arquivo **LICENSE** para mais informações.
