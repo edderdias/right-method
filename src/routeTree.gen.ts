@@ -11,12 +11,15 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CartoesRouteImport } from './routes/cartoes'
+import { Route as CertoIaRouteImport } from './routes/certo-ia'
+import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as ContasRouteImport } from './routes/contas'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as DespesasRouteImport } from './routes/despesas'
 import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as MetasRouteImport } from './routes/metas'
 import { Route as ReceitasRouteImport } from './routes/receitas'
+import { Route as RelatoriosRouteImport } from './routes/relatorios'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -26,6 +29,16 @@ const IndexRoute = IndexRouteImport.update({
 const CartoesRoute = CartoesRouteImport.update({
   id: '/cartoes',
   path: '/cartoes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CertoIaRoute = CertoIaRouteImport.update({
+  id: '/certo-ia',
+  path: '/certo-ia',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
+  id: '/configuracoes',
+  path: '/configuracoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ContasRoute = ContasRouteImport.update({
@@ -58,80 +71,106 @@ const ReceitasRoute = ReceitasRouteImport.update({
   path: '/receitas',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RelatoriosRoute = RelatoriosRouteImport.update({
+  id: '/relatorios',
+  path: '/relatorios',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cartoes': typeof CartoesRoute
+  '/certo-ia': typeof CertoIaRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/contas': typeof ContasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
+  '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cartoes': typeof CartoesRoute
+  '/certo-ia': typeof CertoIaRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/contas': typeof ContasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
+  '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/cartoes': typeof CartoesRoute
+  '/certo-ia': typeof CertoIaRoute
+  '/configuracoes': typeof ConfiguracoesRoute
   '/contas': typeof ContasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
   '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
+  '/relatorios': typeof RelatoriosRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/cartoes'
+    | '/certo-ia'
+    | '/configuracoes'
     | '/contas'
     | '/dashboard'
     | '/despesas'
     | '/investimentos'
     | '/metas'
     | '/receitas'
+    | '/relatorios'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/cartoes'
+    | '/certo-ia'
+    | '/configuracoes'
     | '/contas'
     | '/dashboard'
     | '/despesas'
     | '/investimentos'
     | '/metas'
     | '/receitas'
+    | '/relatorios'
   id:
     | '__root__'
     | '/'
     | '/cartoes'
+    | '/certo-ia'
+    | '/configuracoes'
     | '/contas'
     | '/dashboard'
     | '/despesas'
     | '/investimentos'
     | '/metas'
     | '/receitas'
+    | '/relatorios'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CartoesRoute: typeof CartoesRoute
+  CertoIaRoute: typeof CertoIaRoute
+  ConfiguracoesRoute: typeof ConfiguracoesRoute
   ContasRoute: typeof ContasRoute
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
   InvestimentosRoute: typeof InvestimentosRoute
   MetasRoute: typeof MetasRoute
   ReceitasRoute: typeof ReceitasRoute
+  RelatoriosRoute: typeof RelatoriosRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -148,6 +187,20 @@ declare module '@tanstack/react-router' {
       path: '/cartoes'
       fullPath: '/cartoes'
       preLoaderRoute: typeof CartoesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/certo-ia': {
+      id: '/certo-ia'
+      path: '/certo-ia'
+      fullPath: '/certo-ia'
+      preLoaderRoute: typeof CertoIaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/configuracoes': {
+      id: '/configuracoes'
+      path: '/configuracoes'
+      fullPath: '/configuracoes'
+      preLoaderRoute: typeof ConfiguracoesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/contas': {
@@ -192,18 +245,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReceitasRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/relatorios': {
+      id: '/relatorios'
+      path: '/relatorios'
+      fullPath: '/relatorios'
+      preLoaderRoute: typeof RelatoriosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CartoesRoute: CartoesRoute,
+  CertoIaRoute: CertoIaRoute,
+  ConfiguracoesRoute: ConfiguracoesRoute,
   ContasRoute: ContasRoute,
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
   InvestimentosRoute: InvestimentosRoute,
   MetasRoute: MetasRoute,
   ReceitasRoute: ReceitasRoute,
+  RelatoriosRoute: RelatoriosRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

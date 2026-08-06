@@ -29,9 +29,9 @@ const nav = [
   { label: "Investimentos", icon: LineChart, to: "/investimentos" as const },
   { label: "Metas", icon: Target, to: "/metas" as const },
 
-  { label: "Relatórios", icon: CalendarClock },
-  { label: "Certo IA", icon: Sparkles },
-  { label: "Configurações", icon: Settings },
+  { label: "Relatórios", icon: CalendarClock, to: "/relatorios" as const },
+  { label: "Certo IA", icon: Sparkles, to: "/certo-ia" as const },
+  { label: "Configurações", icon: Settings, to: "/configuracoes" as const },
 ];
 
 const itemBase =
@@ -56,24 +56,17 @@ export function AppShell({ children }: { children: ReactNode }) {
             {sidebarOpen ? <BrandLockup /> : <BrandMark />}
           </div>
           <nav className="flex-1 space-y-1" aria-label="Navegação principal">
-            {nav.map((item) =>
-              item.to ? (
-                <Link
-                  key={item.label}
-                  to={item.to}
-                  className={cn(itemBase, inactive)}
-                  activeProps={{ className: cn(itemBase, active) }}
-                >
-                  <item.icon className="size-5 shrink-0" aria-hidden="true" />
-                  {sidebarOpen && <span className="truncate">{item.label}</span>}
-                </Link>
-              ) : (
-                <button key={item.label} type="button" className={cn(itemBase, inactive)}>
-                  <item.icon className="size-5 shrink-0" aria-hidden="true" />
-                  {sidebarOpen && <span className="truncate">{item.label}</span>}
-                </button>
-              ),
-            )}
+            {nav.map((item) => (
+              <Link
+                key={item.label}
+                to={item.to}
+                className={cn(itemBase, inactive)}
+                activeProps={{ className: cn(itemBase, active) }}
+              >
+                <item.icon className="size-5 shrink-0" aria-hidden="true" />
+                {sidebarOpen && <span className="truncate">{item.label}</span>}
+              </Link>
+            ))}
           </nav>
           <Link
             to="/"
