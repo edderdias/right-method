@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+
+import { requireAuth } from "@/lib/auth";
 import { useState } from "react";
 import {
   Area,
@@ -27,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/contas")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Contas bancárias | Método Certo" },

@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowDownRight,
   Bell,
@@ -18,6 +18,7 @@ import {
 
 import { BrandLockup, BrandMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
+import { clearSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -42,6 +43,12 @@ const active = "bg-sidebar-accent text-sidebar-primary";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const navigate = useNavigate();
+
+  function handleLogout() {
+    clearSession();
+    navigate({ to: "/" });
+  }
 
   return (
     <div className="min-h-dvh bg-background">
@@ -68,12 +75,13 @@ export function AppShell({ children }: { children: ReactNode }) {
               </Link>
             ))}
           </nav>
-          <Link
-            to="/"
-            className="mt-4 rounded-xl px-3 py-2.5 text-sm text-muted-foreground hover:text-foreground"
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="mt-4 rounded-xl px-3 py-2.5 text-left text-sm text-muted-foreground hover:text-foreground"
           >
             {sidebarOpen ? "Sair da conta" : "←"}
-          </Link>
+          </button>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col">

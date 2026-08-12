@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+
+import { requireAuth } from "@/lib/auth";
 import {
   Area,
   AreaChart,
@@ -31,6 +33,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Dashboard | Método Certo" },

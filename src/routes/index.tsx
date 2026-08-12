@@ -1,13 +1,15 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Eye, EyeOff, Loader2, Lock, Mail, ShieldCheck } from "lucide-react";
 
-import poster from "@/assets/poster.png.asset.json";
+import poster from "@/assets/metodo-certo-poster.png";
 import { BrandLockup } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ApiError } from "@/lib/api-client";
+import { login } from "@/lib/auth";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,11 +34,21 @@ function LoginPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    setError(null);
     setLoading(true);
-    setTimeout(() => navigate({ to: "/dashboard" }), 600);
+    try {
+      await login(email, password);
+      navigate({ to: "/dashboard" });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Não foi possível entrar. Tente novamente.");
+      setLoading(false);
+    }
   }
 
   return (
@@ -67,6 +79,8 @@ function LoginPage() {
                   autoComplete="email"
                   placeholder="voce@email.com"
                   className="h-12 rounded-xl pl-10"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
                 />
               </div>
             </div>
@@ -85,6 +99,8 @@ function LoginPage() {
                   autoComplete="current-password"
                   placeholder="••••••••"
                   className="h-12 rounded-xl px-10"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
                 />
                 <button
                   type="button"
@@ -109,6 +125,12 @@ function LoginPage() {
               </a>
             </div>
 
+            {error && (
+              <p role="alert" className="text-sm font-medium text-destructive">
+                {error}
+              </p>
+            )}
+
             <Button
               type="submit"
               disabled={loading}
@@ -118,26 +140,26 @@ function LoginPage() {
             </Button>
           </form>
 
-          <div className="my-6 flex items-center gap-4 text-xs uppercase tracking-widest text-muted-foreground">
+          {/* <div className="my-6 flex items-center gap-4 text-xs uppercase tracking-widest text-muted-foreground">
             <span className="h-px flex-1 bg-border" />
             ou
             <span className="h-px flex-1 bg-border" />
-          </div>
+          </div> */}
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          {/* <div className="grid gap-3 sm:grid-cols-2">
             <Button variant="outline" className="h-12 rounded-xl">
               Continuar com Google
             </Button>
             <Button variant="outline" className="h-12 rounded-xl">
               Continuar com Apple
             </Button>
-          </div>
+          </div> */}
 
           <p className="mt-8 text-center text-sm text-muted-foreground">
             Ainda não tem conta?{" "}
-            <a href="#" className="font-semibold text-primary hover:underline">
+            <Link to="/cadastro" className="font-semibold text-primary hover:underline">
               Cadastre-se
-            </a>
+            </Link>
           </p>
 
           <p className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground">
@@ -149,9 +171,9 @@ function LoginPage() {
 
       <section className="relative hidden overflow-hidden lg:block">
         <img
-          src={poster.url}
+          src={poster}
           alt="Ilustração de crescimento financeiro com moedas e gráfico em alta"
-          className="absolute inset-0 size-full object-cover"
+          className="absolute inset-0 size-full object-cover object-[center_30%]"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-foreground/70 via-transparent to-transparent" />
         <div className="glass absolute inset-x-8 bottom-8 rounded-3xl p-6">

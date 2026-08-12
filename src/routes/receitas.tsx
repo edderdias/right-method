@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+
+import { requireAuth } from "@/lib/auth";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -27,6 +29,7 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/receitas")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Receitas | Método Certo" },

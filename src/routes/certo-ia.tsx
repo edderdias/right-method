@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+
+import { requireAuth } from "@/lib/auth";
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, Lightbulb, RefreshCw, TrendingDown, Wallet } from "lucide-react";
 
@@ -9,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/certo-ia")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Certo IA | Assistente financeiro do Método Certo" },

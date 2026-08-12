@@ -1,10 +1,10 @@
-import logo from "@/assets/logo.png.asset.json";
+import logo from "@/assets/metodo-certo-logo.png";
 import { cn } from "@/lib/utils";
 
 export function BrandMark({ className }: { className?: string }) {
   return (
     <img
-      src={logo.url}
+      src={logo}
       alt="Método Certo"
       className={cn("h-10 w-10 rounded-xl object-cover", className)}
       loading="lazy"

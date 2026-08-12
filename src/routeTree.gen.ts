@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CadastroRouteImport } from './routes/cadastro'
 import { Route as CartoesRouteImport } from './routes/cartoes'
 import { Route as CertoIaRouteImport } from './routes/certo-ia'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
@@ -20,10 +21,16 @@ import { Route as InvestimentosRouteImport } from './routes/investimentos'
 import { Route as MetasRouteImport } from './routes/metas'
 import { Route as ReceitasRouteImport } from './routes/receitas'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CadastroRoute = CadastroRouteImport.update({
+  id: '/cadastro',
+  path: '/cadastro',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CartoesRoute = CartoesRouteImport.update({
@@ -76,9 +83,15 @@ const RelatoriosRoute = RelatoriosRouteImport.update({
   path: '/relatorios',
   getParentRoute: () => rootRouteImport,
 } as any)
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cadastro': typeof CadastroRoute
   '/cartoes': typeof CartoesRoute
   '/certo-ia': typeof CertoIaRoute
   '/configuracoes': typeof ConfiguracoesRoute
@@ -89,9 +102,11 @@ export interface FileRoutesByFullPath {
   '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
   '/relatorios': typeof RelatoriosRoute
+  '/verify-email': typeof VerifyEmailRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cadastro': typeof CadastroRoute
   '/cartoes': typeof CartoesRoute
   '/certo-ia': typeof CertoIaRoute
   '/configuracoes': typeof ConfiguracoesRoute
@@ -102,10 +117,12 @@ export interface FileRoutesByTo {
   '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
   '/relatorios': typeof RelatoriosRoute
+  '/verify-email': typeof VerifyEmailRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cadastro': typeof CadastroRoute
   '/cartoes': typeof CartoesRoute
   '/certo-ia': typeof CertoIaRoute
   '/configuracoes': typeof ConfiguracoesRoute
@@ -116,11 +133,13 @@ export interface FileRoutesById {
   '/metas': typeof MetasRoute
   '/receitas': typeof ReceitasRoute
   '/relatorios': typeof RelatoriosRoute
+  '/verify-email': typeof VerifyEmailRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/cadastro'
     | '/cartoes'
     | '/certo-ia'
     | '/configuracoes'
@@ -131,9 +150,11 @@ export interface FileRouteTypes {
     | '/metas'
     | '/receitas'
     | '/relatorios'
+    | '/verify-email'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/cadastro'
     | '/cartoes'
     | '/certo-ia'
     | '/configuracoes'
@@ -144,9 +165,11 @@ export interface FileRouteTypes {
     | '/metas'
     | '/receitas'
     | '/relatorios'
+    | '/verify-email'
   id:
     | '__root__'
     | '/'
+    | '/cadastro'
     | '/cartoes'
     | '/certo-ia'
     | '/configuracoes'
@@ -157,10 +180,12 @@ export interface FileRouteTypes {
     | '/metas'
     | '/receitas'
     | '/relatorios'
+    | '/verify-email'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CadastroRoute: typeof CadastroRoute
   CartoesRoute: typeof CartoesRoute
   CertoIaRoute: typeof CertoIaRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
@@ -171,6 +196,7 @@ export interface RootRouteChildren {
   MetasRoute: typeof MetasRoute
   ReceitasRoute: typeof ReceitasRoute
   RelatoriosRoute: typeof RelatoriosRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -180,6 +206,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cadastro': {
+      id: '/cadastro'
+      path: '/cadastro'
+      fullPath: '/cadastro'
+      preLoaderRoute: typeof CadastroRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/cartoes': {
@@ -252,11 +285,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RelatoriosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CadastroRoute: CadastroRoute,
   CartoesRoute: CartoesRoute,
   CertoIaRoute: CertoIaRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
@@ -267,6 +308,7 @@ const rootRouteChildren: RootRouteChildren = {
   MetasRoute: MetasRoute,
   ReceitasRoute: ReceitasRoute,
   RelatoriosRoute: RelatoriosRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

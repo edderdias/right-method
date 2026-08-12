@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+
+import { requireAuth } from "@/lib/auth";
 import { useState } from "react";
 import {
   Bell,
@@ -20,6 +22,7 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/configuracoes")({
+  beforeLoad: requireAuth,
   head: () => ({
     meta: [
       { title: "Configurações | Método Certo" },
