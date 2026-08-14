@@ -8,9 +8,24 @@ import { AllExceptionsFilter } from "./common/filters/all-exceptions.filter";
 import { TransformInterceptor } from "./common/interceptors/transform.interceptor";
 import { AuthModule } from "./modules/auth/auth.module";
 import { JwtAuthGuard } from "./modules/auth/guards/jwt-auth.guard";
+import { AccountsModule } from "./modules/accounts/accounts.module";
+import { CategoriesModule } from "./modules/categories/categories.module";
+import { RevenuesModule } from "./modules/revenues/revenues.module";
+import { ExpensesModule } from "./modules/expenses/expenses.module";
+import { DashboardModule } from "./modules/dashboard/dashboard.module";
 
 @Module({
-  imports: [ConfigModule, PrismaModule, RedisModule, AuthModule],
+  imports: [
+    ConfigModule,
+    PrismaModule,
+    RedisModule,
+    AuthModule,
+    AccountsModule,
+    CategoriesModule,
+    RevenuesModule,
+    ExpensesModule,
+    DashboardModule,
+  ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },

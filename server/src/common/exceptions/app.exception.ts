@@ -83,3 +83,33 @@ export class SessionNotFoundException extends AppException {
     super("SESSION_NOT_FOUND", "Sessão não encontrada.", HttpStatus.NOT_FOUND);
   }
 }
+
+export class RevenueNotFoundException extends AppException {
+  constructor() {
+    super("REVENUE_NOT_FOUND", "Receita não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class FinanceAccountNotFoundException extends AppException {
+  constructor() {
+    super("ACCOUNT_NOT_FOUND", "Conta não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class CategoryNotFoundException extends AppException {
+  constructor() {
+    super("CATEGORY_NOT_FOUND", "Categoria não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class ExpenseNotFoundException extends AppException {
+  constructor() {
+    super("EXPENSE_NOT_FOUND", "Despesa não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class InvalidExpenseConfigException extends AppException {
+  constructor(message = "Configuração de despesa inválida.") {
+    super("INVALID_EXPENSE_CONFIG", message, HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+}

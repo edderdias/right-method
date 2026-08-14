@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { ReactNode } from "react";
 
 import { requireAuth } from "@/lib/auth";
 import {
@@ -30,6 +31,10 @@ import { AppShell, brl } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDashboardSummary, useRevenuesEvolution } from "@/hooks/use-revenues";
+import { useExpensesByCategory, useExpensesEvolution } from "@/hooks/use-expenses";
+import { formatMonthKeyShort } from "@/lib/finance-format";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/dashboard")({
@@ -52,14 +57,12 @@ export const Route = createFileRoute("/dashboard")({
   component: DashboardPage,
 });
 
-
-const cashFlow = [
-  { mes: "Mar", receitas: 9200, despesas: 6100 },
-  { mes: "Abr", receitas: 9800, despesas: 6900 },
-  { mes: "Mai", receitas: 10400, despesas: 6400 },
-  { mes: "Jun", receitas: 9900, despesas: 7300 },
-  { mes: "Jul", receitas: 11200, despesas: 6800 },
-  { mes: "Ago", receitas: 11800, despesas: 7100 },
+const CATEGORY_CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
 const patrimonio = [
@@ -69,14 +72,6 @@ const patrimonio = [
   { mes: "Jun", valor: 129100 },
   { mes: "Jul", valor: 134600 },
   { mes: "Ago", valor: 140200 },
-];
-
-const categorias = [
-  { nome: "Alimentação", valor: 1840, cor: "var(--chart-1)" },
-  { nome: "Moradia", valor: 2400, cor: "var(--chart-2)" },
-  { nome: "Transporte", valor: 780, cor: "var(--chart-3)" },
-  { nome: "Lazer", valor: 640, cor: "var(--chart-4)" },
-  { nome: "Outros", valor: 440, cor: "var(--chart-5)" },
 ];
 
 const metas = [
@@ -98,258 +93,289 @@ const insights = [
 ];
 
 function DashboardPage() {
+  const summaryQuery = useDashboardSummary({});
+  const revenuesEvolutionQuery = useRevenuesEvolution(6);
+  const expensesEvolutionQuery = useExpensesEvolution(6);
+  const expensesByCategoryQuery = useExpensesByCategory({});
+
+  const cashFlow = (revenuesEvolutionQuery.data ?? []).map((point, index) => ({
+    mes: formatMonthKeyShort(point.month),
+    receitas: point.total,
+    despesas: expensesEvolutionQuery.data?.[index]?.total ?? 0,
+  }));
+
+  const expensesByCategory = (expensesByCategoryQuery.data ?? []).map((item, index) => ({
+    ...item,
+    cor: CATEGORY_CHART_COLORS[index % CATEGORY_CHART_COLORS.length],
+  }));
+
   return (
     <AppShell>
       <div>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Olá, Marina</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Aqui está o resumo das suas finanças no período.
+        </p>
+      </div>
 
-              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Olá, Marina</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Aqui está o resumo das suas finanças em agosto.
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title="Saldo atual"
+          value={
+            summaryQuery.isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              brl(summaryQuery.data?.currentBalance ?? 0)
+            )
+          }
+          positive
+          icon={Wallet}
+          highlight
+        />
+        <StatCard
+          title="Receitas do mês"
+          value={
+            summaryQuery.isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              brl(summaryQuery.data?.income.total ?? 0)
+            )
+          }
+          positive
+          icon={TrendingUp}
+        />
+        <StatCard
+          title="Despesas do mês"
+          value={
+            summaryQuery.isLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              brl(summaryQuery.data?.expenses.total ?? 0)
+            )
+          }
+          icon={ArrowDownRight}
+        />
+        <StatCard title="Patrimônio" value={brl(140200)} delta="+4,2%" positive icon={PiggyBank} />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <Card className="rounded-3xl border-border/70 shadow-soft xl:col-span-2">
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold">Fluxo de caixa</CardTitle>
+            <span className="text-xs text-muted-foreground">Últimos 6 meses</span>
+          </CardHeader>
+          <CardContent className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={cashFlow} barGap={6}>
+                <CartesianGrid vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={12}
+                  tickFormatter={(v: number) => `${v / 1000}k`}
+                />
+                <Tooltip
+                  cursor={{ fill: "var(--muted)" }}
+                  formatter={(v: number) => brl(v)}
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "1px solid var(--border)",
+                    background: "var(--popover)",
+                  }}
+                />
+                <Bar dataKey="receitas" fill="var(--chart-1)" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="despesas" fill="var(--chart-2)" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader className="flex-row items-center gap-2">
+            <Sparkles className="size-4 text-primary" aria-hidden="true" />
+            <CardTitle className="text-base font-semibold">Resumo do Certo IA</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {insights.map((item) => (
+              <div
+                key={item.texto}
+                className={cn(
+                  "rounded-2xl p-4 text-sm",
+                  item.tom === "warning" && "bg-warning/12 text-foreground",
+                  item.tom === "primary" && "bg-primary/12 text-foreground",
+                  item.tom === "info" && "bg-info/12 text-foreground",
+                )}
+              >
+                {item.texto}
+              </div>
+            ))}
+            <Button className="mt-2 w-full rounded-xl bg-gradient-brand font-semibold">
+              Conversar com o Certo IA
+            </Button>
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-3">
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Despesas por categoria</CardTitle>
+          </CardHeader>
+          <CardContent className="h-64">
+            {expensesByCategoryQuery.isLoading ? (
+              <Skeleton className="h-full w-full" />
+            ) : expensesByCategory.length === 0 ? (
+              <div className="flex h-full items-center justify-center">
+                <p className="text-sm text-muted-foreground">Nenhuma despesa paga ainda.</p>
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={expensesByCategory}
+                    dataKey="total"
+                    nameKey="name"
+                    innerRadius={55}
+                    outerRadius={85}
+                    paddingAngle={3}
+                  >
+                    {expensesByCategory.map((c) => (
+                      <Cell key={c.categoryId} fill={c.cor} stroke="transparent" />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(v: number) => brl(v)}
+                    contentStyle={{
+                      borderRadius: 12,
+                      border: "1px solid var(--border)",
+                      background: "var(--popover)",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Evolução do patrimônio</CardTitle>
+          </CardHeader>
+          <CardContent className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={patrimonio}>
+                <defs>
+                  <linearGradient id="pat" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.5} />
+                    <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid vertical={false} stroke="var(--border)" />
+                <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
+                <YAxis
+                  tickLine={false}
+                  axisLine={false}
+                  fontSize={12}
+                  tickFormatter={(v: number) => `${v / 1000}k`}
+                />
+                <Tooltip
+                  formatter={(v: number) => brl(v)}
+                  contentStyle={{
+                    borderRadius: 12,
+                    border: "1px solid var(--border)",
+                    background: "var(--popover)",
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="valor"
+                  stroke="var(--chart-1)"
+                  strokeWidth={2.5}
+                  fill="url(#pat)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Metas financeiras</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            {metas.map((meta) => {
+              const pct = Math.round((meta.atual / meta.alvo) * 100);
+              return (
+                <div key={meta.nome} className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium">{meta.nome}</span>
+                    <span className="text-muted-foreground">{pct}%</span>
+                  </div>
+                  <Progress value={pct} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    {brl(meta.atual)} de {brl(meta.alvo)}
+                  </p>
+                </div>
+              );
+            })}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Contas a vencer</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {contas.map((conta) => (
+              <div
+                key={conta.nome}
+                className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="grid size-9 place-items-center rounded-xl bg-warning/15 text-warning">
+                    <CalendarClock className="size-4" aria-hidden="true" />
+                  </span>
+                  <div>
+                    <p className="text-sm font-medium">{conta.nome}</p>
+                    <p className="text-xs text-muted-foreground">{conta.venc}</p>
+                  </div>
+                </div>
+                <span className="text-sm font-semibold">{brl(conta.valor)}</span>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Cartão Certo</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="rounded-2xl bg-gradient-brand p-5 text-primary-foreground shadow-brand">
+              <div className="flex items-center justify-between">
+                <CreditCard className="size-6" aria-hidden="true" />
+                <span className="text-xs uppercase tracking-widest opacity-80">Crédito</span>
+              </div>
+              <p className="mt-8 text-sm opacity-80">Fatura atual</p>
+              <p className="text-2xl font-semibold">{brl(2140)}</p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Limite utilizado</span>
+                <span className="font-medium">27%</span>
+              </div>
+              <Progress value={27} className="h-2" />
+              <p className="text-xs text-muted-foreground">
+                Disponível {brl(5860)} de {brl(8000)}
               </p>
             </div>
-
-            <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              <StatCard
-                title="Saldo atual"
-                value={brl(14820)}
-                delta="+8,4%"
-                positive
-                icon={Wallet}
-                highlight
-              />
-              <StatCard
-                title="Receitas do mês"
-                value={brl(11800)}
-                delta="+5,3%"
-                positive
-                icon={TrendingUp}
-              />
-              <StatCard
-                title="Despesas do mês"
-                value={brl(7100)}
-                delta="+4,1%"
-                icon={ArrowDownRight}
-              />
-              <StatCard
-                title="Patrimônio"
-                value={brl(140200)}
-                delta="+4,2%"
-                positive
-                icon={PiggyBank}
-              />
-            </section>
-
-            <section className="grid gap-4 xl:grid-cols-3">
-              <Card className="rounded-3xl border-border/70 shadow-soft xl:col-span-2">
-                <CardHeader className="flex-row items-center justify-between">
-                  <CardTitle className="text-base font-semibold">Fluxo de caixa</CardTitle>
-                  <span className="text-xs text-muted-foreground">Últimos 6 meses</span>
-                </CardHeader>
-                <CardContent className="h-72">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={cashFlow} barGap={6}>
-                      <CartesianGrid vertical={false} stroke="var(--border)" />
-                      <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        fontSize={12}
-                        tickFormatter={(v: number) => `${v / 1000}k`}
-                      />
-                      <Tooltip
-                        cursor={{ fill: "var(--muted)" }}
-                        formatter={(v: number) => brl(v)}
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid var(--border)",
-                          background: "var(--popover)",
-                        }}
-                      />
-                      <Bar dataKey="receitas" fill="var(--chart-1)" radius={[8, 8, 0, 0]} />
-                      <Bar dataKey="despesas" fill="var(--chart-2)" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl border-border/70 shadow-soft">
-                <CardHeader className="flex-row items-center gap-2">
-                  <Sparkles className="size-4 text-primary" aria-hidden="true" />
-                  <CardTitle className="text-base font-semibold">Resumo do Certo IA</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {insights.map((item) => (
-                    <div
-                      key={item.texto}
-                      className={cn(
-                        "rounded-2xl p-4 text-sm",
-                        item.tom === "warning" && "bg-warning/12 text-foreground",
-                        item.tom === "primary" && "bg-primary/12 text-foreground",
-                        item.tom === "info" && "bg-info/12 text-foreground",
-                      )}
-                    >
-                      {item.texto}
-                    </div>
-                  ))}
-                  <Button className="mt-2 w-full rounded-xl bg-gradient-brand font-semibold">
-                    Conversar com o Certo IA
-                  </Button>
-                </CardContent>
-              </Card>
-            </section>
-
-            <section className="grid gap-4 xl:grid-cols-3">
-              <Card className="rounded-3xl border-border/70 shadow-soft">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold">Despesas por categoria</CardTitle>
-                </CardHeader>
-                <CardContent className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={categorias}
-                        dataKey="valor"
-                        nameKey="nome"
-                        innerRadius={55}
-                        outerRadius={85}
-                        paddingAngle={3}
-                      >
-                        {categorias.map((c) => (
-                          <Cell key={c.nome} fill={c.cor} stroke="transparent" />
-                        ))}
-                      </Pie>
-                      <Tooltip
-                        formatter={(v: number) => brl(v)}
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid var(--border)",
-                          background: "var(--popover)",
-                        }}
-                      />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl border-border/70 shadow-soft">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold">Evolução do patrimônio</CardTitle>
-                </CardHeader>
-                <CardContent className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <AreaChart data={patrimonio}>
-                      <defs>
-                        <linearGradient id="pat" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.5} />
-                          <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid vertical={false} stroke="var(--border)" />
-                      <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
-                      <YAxis
-                        tickLine={false}
-                        axisLine={false}
-                        fontSize={12}
-                        tickFormatter={(v: number) => `${v / 1000}k`}
-                      />
-                      <Tooltip
-                        formatter={(v: number) => brl(v)}
-                        contentStyle={{
-                          borderRadius: 12,
-                          border: "1px solid var(--border)",
-                          background: "var(--popover)",
-                        }}
-                      />
-                      <Area
-                        type="monotone"
-                        dataKey="valor"
-                        stroke="var(--chart-1)"
-                        strokeWidth={2.5}
-                        fill="url(#pat)"
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl border-border/70 shadow-soft">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold">Metas financeiras</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-5">
-                  {metas.map((meta) => {
-                    const pct = Math.round((meta.atual / meta.alvo) * 100);
-                    return (
-                      <div key={meta.nome} className="space-y-2">
-                        <div className="flex items-center justify-between text-sm">
-                          <span className="font-medium">{meta.nome}</span>
-                          <span className="text-muted-foreground">{pct}%</span>
-                        </div>
-                        <Progress value={pct} className="h-2" />
-                        <p className="text-xs text-muted-foreground">
-                          {brl(meta.atual)} de {brl(meta.alvo)}
-                        </p>
-                      </div>
-                    );
-                  })}
-                </CardContent>
-              </Card>
-            </section>
-
-            <section className="grid gap-4 lg:grid-cols-2">
-              <Card className="rounded-3xl border-border/70 shadow-soft">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold">Contas a vencer</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {contas.map((conta) => (
-                    <div
-                      key={conta.nome}
-                      className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="grid size-9 place-items-center rounded-xl bg-warning/15 text-warning">
-                          <CalendarClock className="size-4" aria-hidden="true" />
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium">{conta.nome}</p>
-                          <p className="text-xs text-muted-foreground">{conta.venc}</p>
-                        </div>
-                      </div>
-                      <span className="text-sm font-semibold">{brl(conta.valor)}</span>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-3xl border-border/70 shadow-soft">
-                <CardHeader>
-                  <CardTitle className="text-base font-semibold">Cartão Certo</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="rounded-2xl bg-gradient-brand p-5 text-primary-foreground shadow-brand">
-                    <div className="flex items-center justify-between">
-                      <CreditCard className="size-6" aria-hidden="true" />
-                      <span className="text-xs uppercase tracking-widest opacity-80">Crédito</span>
-                    </div>
-                    <p className="mt-8 text-sm opacity-80">Fatura atual</p>
-                    <p className="text-2xl font-semibold">{brl(2140)}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Limite utilizado</span>
-                      <span className="font-medium">27%</span>
-                    </div>
-                    <Progress value={27} className="h-2" />
-                    <p className="text-xs text-muted-foreground">
-                      Disponível {brl(5860)} de {brl(8000)}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </section>
+          </CardContent>
+        </Card>
+      </section>
     </AppShell>
-
   );
 }
 
@@ -362,8 +388,8 @@ function StatCard({
   highlight,
 }: {
   title: string;
-  value: string;
-  delta: string;
+  value: ReactNode;
+  delta?: string;
   positive?: boolean;
   icon: typeof Wallet;
   highlight?: boolean;
@@ -380,22 +406,24 @@ function StatCard({
           <span className="grid size-10 place-items-center rounded-2xl bg-primary/12 text-primary">
             <Icon className="size-5" aria-hidden="true" />
           </span>
-          <span
-            className={cn(
-              "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
-              positive ? "bg-primary/12 text-primary" : "bg-warning/15 text-warning",
-            )}
-          >
-            {positive ? (
-              <ArrowUpRight className="size-3" aria-hidden="true" />
-            ) : (
-              <ArrowDownRight className="size-3" aria-hidden="true" />
-            )}
-            {delta}
-          </span>
+          {delta && (
+            <span
+              className={cn(
+                "flex items-center gap-1 rounded-full px-2 py-1 text-xs font-medium",
+                positive ? "bg-primary/12 text-primary" : "bg-warning/15 text-warning",
+              )}
+            >
+              {positive ? (
+                <ArrowUpRight className="size-3" aria-hidden="true" />
+              ) : (
+                <ArrowDownRight className="size-3" aria-hidden="true" />
+              )}
+              {delta}
+            </span>
+          )}
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{title}</p>
-        <p className="mt-1 text-2xl font-semibold tracking-tight">{value}</p>
+        <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
       </CardContent>
     </Card>
   );

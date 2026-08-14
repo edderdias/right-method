@@ -54,6 +54,10 @@ model User {
   sessions             UserSession[]
   verificationTokens   VerificationToken[]
   auditLogs            AuditLog[]
+  accounts             Account[]
+  categories           Category[]
+  revenues             Revenue[]
+  expenses             Expense[]
 
   @@map("users")
 }
@@ -103,4 +107,143 @@ model AuditLog {
   @@index([userId])
   @@index([event])
   @@map("audit_logs")
+}
+
+enum RevenueStatus {
+  PENDING
+  RECEIVED
+  OVERDUE
+}
+
+enum ExpenseStatus {
+  PENDING
+  PAID
+  OVERDUE
+}
+
+enum RecurrenceType {
+  MONTHLY
+  WEEKLY
+  BIWEEKLY
+  YEARLY
+  CUSTOM
+}
+
+enum CategoryType {
+  REVENUE
+  EXPENSE
+}
+
+model Account {
+  id        String   @id @default(uuid())
+  userId    String
+  name      String
+  balance   Decimal  @default(0) @db.Decimal(12, 2)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revenues Revenue[]
+  expenses Expense[]
+
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Category {
+  id        String       @id @default(uuid())
+  userId    String?
+  name      String
+  type      CategoryType
+  createdAt DateTime     @default(now())
+
+  user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revenues Revenue[]
+  expenses Expense[]
+
+  @@index([userId])
+  @@index([type])
+  @@map("categories")
+}
+
+model Revenue {
+  id          String        @id @default(uuid())
+  userId      String
+  description String
+  amount      Decimal       @db.Decimal(12, 2)
+  categoryId  String
+  accountId   String
+  dueDate     DateTime      @db.Date
+  receivedAt  DateTime?     @db.Date
+  status      RevenueStatus @default(PENDING)
+  notes       String?
+
+  isRecurring       Boolean         @default(false)
+  recurrenceType    RecurrenceType?
+  recurrenceEndDate DateTime?       @db.Date
+  parentRevenueId   String?
+
+  installmentGroupId String?
+  installmentNumber  Int?
+  installmentTotal   Int?
+  attachmentUrl       String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category  @relation(fields: [categoryId], references: [id])
+  account       Account   @relation(fields: [accountId], references: [id])
+  parentRevenue Revenue?  @relation("RevenueRecurrence", fields: [parentRevenueId], references: [id], onDelete: SetNull)
+  childRevenues Revenue[] @relation("RevenueRecurrence")
+
+  @@index([userId])
+  @@index([userId, dueDate])
+  @@index([userId, status])
+  @@index([categoryId])
+  @@index([accountId])
+  @@map("revenues")
+}
+
+model Expense {
+  id          String        @id @default(uuid())
+  userId      String
+  description String
+  amount      Decimal       @db.Decimal(12, 2)
+  categoryId  String
+  accountId   String
+  dueDate     DateTime      @db.Date
+  paidAt      DateTime?     @db.Date
+  status      ExpenseStatus @default(PENDING)
+  notes       String?
+
+  isRecurring       Boolean         @default(false)
+  recurrenceType    RecurrenceType?
+  recurrenceEndDate DateTime?       @db.Date
+  parentExpenseId   String?
+
+  isInstallment      Boolean @default(false)
+  installmentGroupId String?
+  installmentNumber  Int?
+  installmentTotal   Int?
+
+  creditCardId  String?
+  attachmentUrl String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      Category  @relation(fields: [categoryId], references: [id])
+  account       Account   @relation(fields: [accountId], references: [id])
+  parentExpense Expense?  @relation("ExpenseRecurrence", fields: [parentExpenseId], references: [id], onDelete: SetNull)
+  childExpenses Expense[] @relation("ExpenseRecurrence")
+
+  @@index([userId])
+  @@index([userId, dueDate])
+  @@index([userId, status])
+  @@index([categoryId])
+  @@index([accountId])
+  @@index([installmentGroupId])
+  @@map("expenses")
 }
