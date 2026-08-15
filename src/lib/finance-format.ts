@@ -51,6 +51,15 @@ export function formatBRL(value: number): string {
   });
 }
 
+export function formatDateTime(value: string): string {
+  return new Date(value).toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function formatShortDate(value: string): string {
   const date = parseISODateToLocalDate(value);
   return `${String(date.getDate()).padStart(2, "0")}/${MONTH_LABELS_SHORT[date.getMonth()]}`;
@@ -72,11 +81,19 @@ export function getMonthRange(year: number, month: number): { from: string; to: 
   return { from: toISODateString(from), to: toISODateString(to) };
 }
 
-export function getLast30DaysRange(): { from: string; to: string } {
+export function getLastNDaysRange(days: number): { from: string; to: string } {
   const to = new Date();
   const from = new Date();
-  from.setDate(from.getDate() - 29);
+  from.setDate(from.getDate() - (days - 1));
   return { from: toISODateString(from), to: toISODateString(to) };
+}
+
+export function getTodayRange(): { from: string; to: string } {
+  return getLastNDaysRange(1);
+}
+
+export function getLast30DaysRange(): { from: string; to: string } {
+  return getLastNDaysRange(30);
 }
 
 export function getLast6MonthsRange(): { from: string; to: string } {

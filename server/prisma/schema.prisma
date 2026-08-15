@@ -37,6 +37,32 @@ enum AuditEvent {
   REGISTER
   REFRESH_TOKEN
   SESSION_REVOKED
+  OPEN_FINANCE_CONNECTION_CREATED
+  OPEN_FINANCE_ACCOUNT_ADDED
+  OPEN_FINANCE_ACCOUNT_DISCONNECTED
+  OPEN_FINANCE_SYNC_COMPLETED
+  OPEN_FINANCE_SYNC_FAILED
+  OPEN_FINANCE_WEBHOOK_RECEIVED
+}
+
+enum ConnectionStatus {
+  CONNECTED
+  SYNCING
+  REQUIRES_REAUTH
+  EXPIRED
+  ERROR
+  DISCONNECTED
+}
+
+enum BankTransactionType {
+  CREDIT
+  DEBIT
+}
+
+enum TransactionSource {
+  MANUAL
+  OPEN_FINANCE
+  CARD
 }
 
 model User {
@@ -58,6 +84,9 @@ model User {
   categories           Category[]
   revenues             Revenue[]
   expenses             Expense[]
+  openFinanceConnections OpenFinanceConnection[]
+  connectedAccounts      ConnectedAccount[]
+  bankTransactions       BankTransaction[]
 
   @@map("users")
 }
@@ -160,6 +189,7 @@ model Category {
   user     User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   revenues Revenue[]
   expenses Expense[]
+  bankTransactions BankTransaction[]
 
   @@index([userId])
   @@index([type])
@@ -246,4 +276,78 @@ model Expense {
   @@index([accountId])
   @@index([installmentGroupId])
   @@map("expenses")
+}
+
+model OpenFinanceConnection {
+  id                  String           @id @default(uuid())
+  userId              String
+  provider            String           @default("PLUGGY")
+  providerItemId      String           @unique
+  institutionName     String
+  institutionImageUrl String?
+  status              ConnectionStatus @default(SYNCING)
+  statusDetail        String?
+  lastSyncAt          DateTime?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts ConnectedAccount[]
+
+  @@index([userId])
+  @@map("open_finance_connections")
+}
+
+model ConnectedAccount {
+  id                String           @id @default(uuid())
+  userId            String
+  connectionId      String
+  externalAccountId String
+  accountType       String
+  accountSubtype    String
+  name              String
+  marketingName     String?
+  numberMasked      String?
+  balance           Decimal          @default(0) @db.Decimal(14, 2)
+  currencyCode      String           @default("BRL")
+  status            ConnectionStatus @default(SYNCING)
+  lastSyncAt        DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  user         User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection   OpenFinanceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  transactions BankTransaction[]
+
+  @@unique([connectionId, externalAccountId])
+  @@index([userId])
+  @@map("connected_accounts")
+}
+
+model BankTransaction {
+  id                     String              @id @default(uuid())
+  userId                 String
+  accountId              String
+  externalTransactionId  String
+  description            String
+  merchantName           String?
+  amount                 Decimal             @db.Decimal(14, 2)
+  type                   BankTransactionType
+  status                 String              @default("POSTED")
+  transactionDate        DateTime            @db.Date
+  categoryId             String?
+  notes                  String?
+  source                 TransactionSource   @default(OPEN_FINANCE)
+  createdAt              DateTime            @default(now())
+  updatedAt              DateTime            @updatedAt
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account  ConnectedAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category Category?        @relation(fields: [categoryId], references: [id])
+
+  @@unique([accountId, externalTransactionId])
+  @@index([userId])
+  @@index([accountId, transactionDate])
+  @@index([categoryId])
+  @@map("bank_transactions")
 }

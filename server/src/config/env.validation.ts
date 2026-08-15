@@ -23,6 +23,18 @@ export const envSchema = z.object({
     .optional()
     .transform((v) => v === "true")
     .default("false"),
+
+  PLUGGY_CLIENT_ID: z.string().min(1),
+  PLUGGY_CLIENT_SECRET: z.string().min(1),
+  PLUGGY_BASE_URL: z.string().url().default("https://api.pluggy.ai"),
+  PLUGGY_WEBHOOK_SECRET: z.string().min(16),
+  OPEN_FINANCE_INITIAL_SYNC_DAYS: z.coerce.number().default(365),
+  /** Public base URL of this API (e.g. an ngrok URL in dev) used to register the Pluggy webhook.
+   * Optional — without it, accounts still sync via the manual "Sincronizar agora" action. */
+  API_PUBLIC_URL: z.preprocess(
+    (v) => (v === "" ? undefined : v),
+    z.string().url().optional(),
+  ),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

@@ -113,3 +113,43 @@ export class InvalidExpenseConfigException extends AppException {
     super("INVALID_EXPENSE_CONFIG", message, HttpStatus.UNPROCESSABLE_ENTITY);
   }
 }
+
+export class OpenFinanceConnectionNotFoundException extends AppException {
+  constructor() {
+    super("OPEN_FINANCE_CONNECTION_NOT_FOUND", "Conexão não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class OpenFinanceAccountNotFoundException extends AppException {
+  constructor() {
+    super("OPEN_FINANCE_ACCOUNT_NOT_FOUND", "Conta conectada não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class OpenFinanceTransactionNotFoundException extends AppException {
+  constructor() {
+    super("OPEN_FINANCE_TRANSACTION_NOT_FOUND", "Movimentação não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class OpenFinanceConsentExpiredException extends AppException {
+  constructor() {
+    super(
+      "OPEN_FINANCE_CONSENT_EXPIRED",
+      "O consentimento expirou ou requer nova autorização. Reconecte sua conta.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class OpenFinanceSyncFailedException extends AppException {
+  constructor(message = "Não foi possível sincronizar a conta. Tente novamente mais tarde.") {
+    super("OPEN_FINANCE_SYNC_FAILED", message, HttpStatus.BAD_GATEWAY);
+  }
+}
+
+export class OpenFinanceWebhookUnauthorizedException extends AppException {
+  constructor() {
+    super("OPEN_FINANCE_WEBHOOK_UNAUTHORIZED", "Webhook não autorizado.", HttpStatus.UNAUTHORIZED);
+  }
+}

@@ -13,6 +13,7 @@ import { CategoriesModule } from "./modules/categories/categories.module";
 import { RevenuesModule } from "./modules/revenues/revenues.module";
 import { ExpensesModule } from "./modules/expenses/expenses.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
+import { OpenFinanceModule } from "./modules/open-finance/open-finance.module";
 
 @Module({
   imports: [
@@ -25,6 +26,7 @@ import { DashboardModule } from "./modules/dashboard/dashboard.module";
     RevenuesModule,
     ExpensesModule,
     DashboardModule,
+    OpenFinanceModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
