@@ -1,10 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
 import { requireAuth } from "@/lib/auth";
 import {
-  Area,
-  AreaChart,
   Bar,
   BarChart,
   CartesianGrid,
@@ -21,6 +19,7 @@ import {
   ArrowUpRight,
   CalendarClock,
   CreditCard,
+  LineChart,
   PiggyBank,
   Sparkles,
   TrendingUp,
@@ -34,6 +33,9 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboardSummary, useRevenuesEvolution } from "@/hooks/use-revenues";
 import { useExpensesByCategory, useExpensesEvolution } from "@/hooks/use-expenses";
+import { useCreditCardsSummary } from "@/hooks/use-credit-cards";
+import { useFinancialGoals, useFinancialGoalsSummary } from "@/hooks/use-financial-goals";
+import { useInvestmentsSummary } from "@/hooks/use-investments";
 import { formatMonthKeyShort } from "@/lib/finance-format";
 import { cn } from "@/lib/utils";
 
@@ -65,21 +67,6 @@ const CATEGORY_CHART_COLORS = [
   "var(--chart-5)",
 ];
 
-const patrimonio = [
-  { mes: "Mar", valor: 118000 },
-  { mes: "Abr", valor: 122400 },
-  { mes: "Mai", valor: 126900 },
-  { mes: "Jun", valor: 129100 },
-  { mes: "Jul", valor: 134600 },
-  { mes: "Ago", valor: 140200 },
-];
-
-const metas = [
-  { nome: "Reserva de emergência", atual: 18400, alvo: 24000 },
-  { nome: "Viagem em família", atual: 6200, alvo: 12000 },
-  { nome: "Entrada do apartamento", atual: 41000, alvo: 90000 },
-];
-
 const contas = [
   { nome: "Energia elétrica", venc: "Vence em 2 dias", valor: 289 },
   { nome: "Fatura Cartão Certo", venc: "Vence em 5 dias", valor: 2140 },
@@ -97,6 +84,23 @@ function DashboardPage() {
   const revenuesEvolutionQuery = useRevenuesEvolution(6);
   const expensesEvolutionQuery = useExpensesEvolution(6);
   const expensesByCategoryQuery = useExpensesByCategory({});
+  const creditCardsSummaryQuery = useCreditCardsSummary();
+  const creditCardsSummary = creditCardsSummaryQuery.data;
+  const creditCardsUsedPct =
+    creditCardsSummary && creditCardsSummary.totalLimit > 0
+      ? Math.round((creditCardsSummary.totalUsed / creditCardsSummary.totalLimit) * 100)
+      : 0;
+  const investmentsSummaryQuery = useInvestmentsSummary();
+  const investmentsSummary = investmentsSummaryQuery.data;
+  const goalsSummaryQuery = useFinancialGoalsSummary();
+  const goalsQuery = useFinancialGoals();
+  const topGoals = (goalsQuery.data ?? [])
+    .filter((goal) => goal.status === "ACTIVE")
+    .sort((a, b) => a.daysRemaining - b.daysRemaining)
+    .slice(0, 3);
+  const patrimonioLoading = summaryQuery.isLoading || investmentsSummaryQuery.isLoading;
+  const patrimonioTotal =
+    (summaryQuery.data?.currentBalance ?? 0) + (investmentsSummary?.totalCurrentValue ?? 0);
 
   const cashFlow = (revenuesEvolutionQuery.data ?? []).map((point, index) => ({
     mes: formatMonthKeyShort(point.month),
@@ -155,7 +159,12 @@ function DashboardPage() {
           }
           icon={ArrowDownRight}
         />
-        <StatCard title="Patrimônio" value={brl(140200)} delta="+4,2%" positive icon={PiggyBank} />
+        <StatCard
+          title="Patrimônio"
+          value={patrimonioLoading ? <Skeleton className="h-8 w-24" /> : brl(patrimonioTotal)}
+          positive
+          icon={PiggyBank}
+        />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-3">
@@ -260,70 +269,85 @@ function DashboardPage() {
 
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Evolução do patrimônio</CardTitle>
+            <CardTitle className="text-base font-semibold">Patrimônio</CardTitle>
           </CardHeader>
-          <CardContent className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={patrimonio}>
-                <defs>
-                  <linearGradient id="pat" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--chart-1)" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="var(--chart-1)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={12}
-                  tickFormatter={(v: number) => `${v / 1000}k`}
-                />
-                <Tooltip
-                  formatter={(v: number) => brl(v)}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid var(--border)",
-                    background: "var(--popover)",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="valor"
-                  stroke="var(--chart-1)"
-                  strokeWidth={2.5}
-                  fill="url(#pat)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+          <CardContent className="flex h-64 flex-col justify-center gap-4">
+            {patrimonioLoading ? (
+              <Skeleton className="h-10 w-40" />
+            ) : (
+              <div>
+                <p className="text-xs text-muted-foreground">Contas + investimentos</p>
+                <p className="mt-1 text-3xl font-semibold tracking-tight">{brl(patrimonioTotal)}</p>
+              </div>
+            )}
+            <div className="grid grid-cols-2 gap-4 border-t border-border/70 pt-4">
+              <div>
+                <p className="text-xs text-muted-foreground">Saldo em contas</p>
+                {summaryQuery.isLoading ? (
+                  <Skeleton className="mt-1 h-6 w-24" />
+                ) : (
+                  <p className="text-sm font-semibold">
+                    {brl(summaryQuery.data?.currentBalance ?? 0)}
+                  </p>
+                )}
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground">Investimentos</p>
+                {investmentsSummaryQuery.isLoading ? (
+                  <Skeleton className="mt-1 h-6 w-24" />
+                ) : (
+                  <p className="text-sm font-semibold">
+                    {brl(investmentsSummary?.totalCurrentValue ?? 0)}
+                  </p>
+                )}
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              A evolução histórica do patrimônio será exibida aqui assim que houver dados
+              suficientes acumulados.
+            </p>
           </CardContent>
         </Card>
 
         <Card className="rounded-3xl border-border/70 shadow-soft">
-          <CardHeader>
+          <CardHeader className="flex-row items-center justify-between">
             <CardTitle className="text-base font-semibold">Metas financeiras</CardTitle>
+            <Link to="/metas" className="text-xs font-medium text-primary hover:underline">
+              Ver todas
+            </Link>
           </CardHeader>
           <CardContent className="space-y-5">
-            {metas.map((meta) => {
-              const pct = Math.round((meta.atual / meta.alvo) * 100);
-              return (
-                <div key={meta.nome} className="space-y-2">
+            {goalsSummaryQuery.isLoading || goalsQuery.isLoading ? (
+              <>
+                <Skeleton className="h-14 w-full" />
+                <Skeleton className="h-14 w-full" />
+              </>
+            ) : (goalsSummaryQuery.data?.activeCount ?? 0) === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-4 text-center">
+                <p className="text-sm text-muted-foreground">Você ainda não tem metas ativas.</p>
+                <Button asChild variant="secondary" className="rounded-xl">
+                  <Link to="/metas">Criar meta</Link>
+                </Button>
+              </div>
+            ) : (
+              topGoals.map((goal) => (
+                <div key={goal.id} className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium">{meta.nome}</span>
-                    <span className="text-muted-foreground">{pct}%</span>
+                    <span className="font-medium">{goal.name}</span>
+                    <span className="text-muted-foreground">{goal.progressPct}%</span>
                   </div>
-                  <Progress value={pct} className="h-2" />
+                  <Progress value={goal.progressPct} className="h-2" />
                   <p className="text-xs text-muted-foreground">
-                    {brl(meta.atual)} de {brl(meta.alvo)}
+                    {brl(goal.currentAmount)} de {brl(goal.targetAmount)}
                   </p>
                 </div>
-              );
-            })}
+              ))
+            )}
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Contas a vencer</CardTitle>
@@ -350,28 +374,104 @@ function DashboardPage() {
         </Card>
 
         <Card className="rounded-3xl border-border/70 shadow-soft">
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Cartão Certo</CardTitle>
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold">Cartões</CardTitle>
+            <Link to="/cartoes" className="text-xs text-muted-foreground hover:text-foreground">
+              Ver todos
+            </Link>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-2xl bg-gradient-brand p-5 text-primary-foreground shadow-brand">
-              <div className="flex items-center justify-between">
-                <CreditCard className="size-6" aria-hidden="true" />
-                <span className="text-xs uppercase tracking-widest opacity-80">Crédito</span>
+            {creditCardsSummaryQuery.isLoading ? (
+              <Skeleton className="h-40 w-full rounded-2xl" />
+            ) : !creditCardsSummary || creditCardsSummary.cardCount === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span className="grid size-11 place-items-center rounded-2xl bg-primary/12 text-primary">
+                  <CreditCard className="size-5" aria-hidden="true" />
+                </span>
+                <p className="text-sm text-muted-foreground">Nenhum cartão cadastrado ainda.</p>
+                <Button asChild variant="secondary" className="rounded-xl">
+                  <Link to="/cartoes">Cadastrar cartão</Link>
+                </Button>
               </div>
-              <p className="mt-8 text-sm opacity-80">Fatura atual</p>
-              <p className="text-2xl font-semibold">{brl(2140)}</p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Limite utilizado</span>
-                <span className="font-medium">27%</span>
+            ) : (
+              <>
+                <div className="rounded-2xl bg-gradient-brand p-5 text-primary-foreground shadow-brand">
+                  <div className="flex items-center justify-between">
+                    <CreditCard className="size-6" aria-hidden="true" />
+                    <span className="text-xs uppercase tracking-widest opacity-80">Crédito</span>
+                  </div>
+                  <p className="mt-8 text-sm opacity-80">Faturas em aberto</p>
+                  <p className="text-2xl font-semibold">
+                    {brl(creditCardsSummary.openInvoicesTotal)}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Limite utilizado</span>
+                    <span className="font-medium">{creditCardsUsedPct}%</span>
+                  </div>
+                  <Progress value={creditCardsUsedPct} className="h-2" />
+                  <p className="text-xs text-muted-foreground">
+                    Disponível {brl(creditCardsSummary.totalAvailable)} de{" "}
+                    {brl(creditCardsSummary.totalLimit)}
+                  </p>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold">Investimentos</CardTitle>
+            <Link
+              to="/investimentos"
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              Ver todos
+            </Link>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {investmentsSummaryQuery.isLoading ? (
+              <Skeleton className="h-40 w-full rounded-2xl" />
+            ) : !investmentsSummary || investmentsSummary.investmentCount === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <span className="grid size-11 place-items-center rounded-2xl bg-primary/12 text-primary">
+                  <LineChart className="size-5" aria-hidden="true" />
+                </span>
+                <p className="text-sm text-muted-foreground">
+                  Nenhum investimento cadastrado ainda.
+                </p>
+                <Button asChild variant="secondary" className="rounded-xl">
+                  <Link to="/investimentos">Cadastrar investimento</Link>
+                </Button>
               </div>
-              <Progress value={27} className="h-2" />
-              <p className="text-xs text-muted-foreground">
-                Disponível {brl(5860)} de {brl(8000)}
-              </p>
-            </div>
+            ) : (
+              <>
+                <div className="rounded-2xl bg-gradient-brand p-5 text-primary-foreground shadow-brand">
+                  <div className="flex items-center justify-between">
+                    <LineChart className="size-6" aria-hidden="true" />
+                    <span className="text-xs uppercase tracking-widest opacity-80">Carteira</span>
+                  </div>
+                  <p className="mt-8 text-sm opacity-80">Valor atual</p>
+                  <p className="text-2xl font-semibold">
+                    {brl(investmentsSummary.totalCurrentValue)}
+                  </p>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Rentabilidade</span>
+                  <span
+                    className={cn(
+                      "font-medium",
+                      investmentsSummary.totalReturn >= 0 ? "text-primary" : "text-destructive",
+                    )}
+                  >
+                    {investmentsSummary.totalReturn >= 0 ? "+" : ""}
+                    {investmentsSummary.totalReturnPct.toFixed(2)}%
+                  </span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
       </section>

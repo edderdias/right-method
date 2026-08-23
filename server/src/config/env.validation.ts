@@ -31,10 +31,12 @@ export const envSchema = z.object({
   OPEN_FINANCE_INITIAL_SYNC_DAYS: z.coerce.number().default(365),
   /** Public base URL of this API (e.g. an ngrok URL in dev) used to register the Pluggy webhook.
    * Optional — without it, accounts still sync via the manual "Sincronizar agora" action. */
-  API_PUBLIC_URL: z.preprocess(
-    (v) => (v === "" ? undefined : v),
-    z.string().url().optional(),
-  ),
+  API_PUBLIC_URL: z.preprocess((v) => (v === "" ? undefined : v), z.string().url().optional()),
+
+  /** Optional global fallback — normally each user configures their own key in Configurações. */
+  OPENAI_API_KEY: z.string().optional(),
+  OPENAI_MODEL: z.string().default("gpt-4o-mini"),
+  OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

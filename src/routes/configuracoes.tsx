@@ -1,25 +1,64 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 
 import { requireAuth } from "@/lib/auth";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bell,
+  Copy,
+  Eye,
+  EyeOff,
   Fingerprint,
   Globe,
+  KeyRound,
   LogOut,
   Moon,
   Palette,
+  RefreshCw,
   ShieldCheck,
   Smartphone,
   Sun,
   User,
+  UserPlus,
+  Users,
+  X,
 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { BrandMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import {
+  useActiveFamilyInvite,
+  useCreateFamilyInvite,
+  useFamilyAccess,
+  useFamilyMembers,
+  useRedeemFamilyInvite,
+  useRevokeFamilyGrant,
+  useRevokeFamilyInvite,
+} from "@/hooks/use-family";
+import { useOpenAiKeyStatus, useRemoveOpenAiKey, useSaveOpenAiKey } from "@/hooks/use-ai-chat";
+import {
+  useChangePassword,
+  useCurrentUser,
+  useUpdateNotificationPreferences,
+  useUpdateProfile,
+  useUpdateSecurityPreferences,
+} from "@/hooks/use-user-settings";
+import { ApiError } from "@/lib/api-client";
+import { logoutAllSessions } from "@/lib/auth";
+import { formatDateTime } from "@/lib/finance-format";
 import { cn } from "@/lib/utils";
+import type { NotificationPreferences, SecurityPreferences } from "@/types/user";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/configuracoes")({
   beforeLoad: requireAuth,
@@ -43,18 +82,42 @@ export const Route = createFileRoute("/configuracoes")({
   component: ConfiguracoesPage,
 });
 
-const notificacoes = [
-  { id: "vencimento", label: "Contas vencendo", detalhe: "Aviso 3 dias antes do vencimento" },
-  { id: "cartao", label: "Fatura do cartão", detalhe: "Fechamento e vencimento das faturas" },
-  { id: "meta", label: "Progresso de metas", detalhe: "Quando você atinge marcos importantes" },
-  { id: "saldo", label: "Saldo baixo", detalhe: "Quando o saldo ficar abaixo de R$ 500" },
-  { id: "investimento", label: "Investimentos", detalhe: "Dividendos, vencimentos e rentabilidade" },
+const notificacoes: { id: keyof NotificationPreferences; label: string; detalhe: string }[] = [
+  { id: "notifyBillDue", label: "Contas vencendo", detalhe: "Aviso 3 dias antes do vencimento" },
+  { id: "notifyCardInvoice", label: "Fatura do cartão", detalhe: "Fechamento e vencimento das faturas" },
+  { id: "notifyGoalProgress", label: "Progresso de metas", detalhe: "Quando você atinge marcos importantes" },
+  { id: "notifyLowBalance", label: "Saldo baixo", detalhe: "Quando o saldo ficar abaixo de R$ 500" },
+  {
+    id: "notifyInvestment",
+    label: "Investimentos",
+    detalhe: "Dividendos, vencimentos e rentabilidade",
+  },
 ];
 
-const seguranca = [
-  { id: "biometria", label: "Biometria", detalhe: "Entrar com digital ou Face ID", icon: Fingerprint },
-  { id: "2fa", label: "Autenticação em 2 fatores", detalhe: "Código por app autenticador", icon: ShieldCheck },
-  { id: "sessoes", label: "Alerta de novo dispositivo", detalhe: "Avisar em cada novo login", icon: Smartphone },
+const seguranca: {
+  id: keyof SecurityPreferences;
+  label: string;
+  detalhe: string;
+  icon: typeof Fingerprint;
+}[] = [
+  {
+    id: "biometricEnabled",
+    label: "Biometria",
+    detalhe: "Entrar com digital ou Face ID",
+    icon: Fingerprint,
+  },
+  {
+    id: "twoFactorEnabled",
+    label: "Autenticação em 2 fatores",
+    detalhe: "Código por app autenticador",
+    icon: ShieldCheck,
+  },
+  {
+    id: "newDeviceAlertEnabled",
+    label: "Alerta de novo dispositivo",
+    detalhe: "Avisar em cada novo login",
+    icon: Smartphone,
+  },
 ];
 
 const temas = [
@@ -64,19 +127,106 @@ const temas = [
 ] as const;
 
 function ConfiguracoesPage() {
+  const navigate = useNavigate();
   const [tema, setTema] = useState<(typeof temas)[number]["id"]>("claro");
-  const [ativas, setAtivas] = useState<Record<string, boolean>>({
-    vencimento: true,
-    cartao: true,
-    meta: true,
-    saldo: false,
-    investimento: true,
-    biometria: true,
-    "2fa": false,
-    sessoes: true,
-  });
+  const [ocultarSaldos, setOcultarSaldos] = useState(false);
 
-  const alternar = (id: string) => setAtivas((s) => ({ ...s, [id]: !s[id] }));
+  const { data: currentUser } = useCurrentUser();
+  const updateProfileMutation = useUpdateProfile();
+  const notificationPrefsMutation = useUpdateNotificationPreferences();
+  const securityPrefsMutation = useUpdateSecurityPreferences();
+  const changePasswordMutation = useChangePassword();
+
+  const [profileForm, setProfileForm] = useState({ name: "", phone: "", currency: "BRL" });
+  useEffect(() => {
+    if (currentUser) {
+      setProfileForm({
+        name: currentUser.name,
+        phone: currentUser.phone ?? "",
+        currency: currentUser.currency,
+      });
+    }
+  }, [currentUser]);
+
+  function handleSaveProfile() {
+    updateProfileMutation.mutate({
+      name: profileForm.name,
+      phone: profileForm.phone,
+      currency: profileForm.currency,
+    });
+  }
+
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+
+  function handleChangePassword() {
+    if (newPassword !== confirmPassword) {
+      toast.error("As senhas não coincidem.");
+      return;
+    }
+    changePasswordMutation.mutate(
+      { currentPassword, newPassword },
+      {
+        onSuccess: () => {
+          setPasswordDialogOpen(false);
+          setCurrentPassword("");
+          setNewPassword("");
+          setConfirmPassword("");
+        },
+      },
+    );
+  }
+
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
+  async function handleLogoutAll() {
+    setLoggingOutAll(true);
+    try {
+      const message = await logoutAllSessions();
+      toast.success(message);
+      navigate({ to: "/" });
+    } catch (error) {
+      toast.error(
+        error instanceof ApiError ? error.message : "Não foi possível encerrar as sessões.",
+      );
+    } finally {
+      setLoggingOutAll(false);
+    }
+  }
+
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+  const { data: aiKeyStatus } = useOpenAiKeyStatus();
+  const saveOpenAiKeyMutation = useSaveOpenAiKey();
+  const removeOpenAiKeyMutation = useRemoveOpenAiKey();
+
+  const handleSaveApiKey = () => {
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) return;
+    saveOpenAiKeyMutation.mutate(trimmed, { onSuccess: () => setApiKeyInput("") });
+  };
+
+  const { data: activeInvite } = useActiveFamilyInvite();
+  const createInviteMutation = useCreateFamilyInvite();
+  const revokeInviteMutation = useRevokeFamilyInvite();
+  const { data: familyMembers } = useFamilyMembers();
+  const { data: accessibleAccounts } = useFamilyAccess();
+  const redeemInviteMutation = useRedeemFamilyInvite();
+  const revokeGrantMutation = useRevokeFamilyGrant();
+  const [redeemCode, setRedeemCode] = useState("");
+
+  function handleCopyCode() {
+    if (!activeInvite) return;
+    void navigator.clipboard.writeText(activeInvite.code);
+    toast.success("Código copiado!");
+  }
+
+  function handleRedeem() {
+    const trimmed = redeemCode.trim();
+    if (!trimmed) return;
+    redeemInviteMutation.mutate(trimmed, { onSuccess: () => setRedeemCode("") });
+  }
 
   return (
     <AppShell>
@@ -98,15 +248,19 @@ function ConfiguracoesPage() {
           <CardContent className="space-y-4">
             <div className="flex flex-wrap items-center gap-4">
               <span className="grid size-16 place-items-center rounded-2xl bg-gradient-brand text-lg font-semibold text-primary-foreground">
-                MC
+                {(currentUser?.name ?? "?")
+                  .trim()
+                  .split(/\s+/)
+                  .filter(Boolean)
+                  .slice(0, 2)
+                  .map((p) => p[0])
+                  .join("")
+                  .toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-lg font-semibold">Marina Costa</p>
-                <p className="text-sm text-muted-foreground">marina.costa@email.com</p>
+                <p className="text-lg font-semibold">{currentUser?.name ?? "..."}</p>
+                <p className="text-sm text-muted-foreground">{currentUser?.email ?? ""}</p>
               </div>
-              <Button variant="secondary" className="rounded-xl">
-                Trocar foto
-              </Button>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -115,7 +269,8 @@ function ConfiguracoesPage() {
                 </label>
                 <input
                   id="nome"
-                  defaultValue="Marina Costa"
+                  value={profileForm.name}
+                  onChange={(e) => setProfileForm((f) => ({ ...f, name: e.target.value }))}
                   className="mt-2 h-11 w-full rounded-xl border border-input bg-surface px-4 text-sm outline-none focus:ring-2 focus:ring-ring/40"
                 />
               </div>
@@ -126,8 +281,9 @@ function ConfiguracoesPage() {
                 <input
                   id="email"
                   type="email"
-                  defaultValue="marina.costa@email.com"
-                  className="mt-2 h-11 w-full rounded-xl border border-input bg-surface px-4 text-sm outline-none focus:ring-2 focus:ring-ring/40"
+                  value={currentUser?.email ?? ""}
+                  disabled
+                  className="mt-2 h-11 w-full rounded-xl border border-input bg-surface-2 px-4 text-sm text-muted-foreground outline-none"
                 />
               </div>
               <div>
@@ -136,7 +292,9 @@ function ConfiguracoesPage() {
                 </label>
                 <input
                   id="telefone"
-                  defaultValue="(11) 98877-4321"
+                  value={profileForm.phone}
+                  onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
+                  placeholder="(11) 98877-4321"
                   className="mt-2 h-11 w-full rounded-xl border border-input bg-surface px-4 text-sm outline-none focus:ring-2 focus:ring-ring/40"
                 />
               </div>
@@ -146,7 +304,8 @@ function ConfiguracoesPage() {
                 </label>
                 <select
                   id="moeda"
-                  defaultValue="BRL"
+                  value={profileForm.currency}
+                  onChange={(e) => setProfileForm((f) => ({ ...f, currency: e.target.value }))}
                   className="mt-2 h-11 w-full rounded-xl border border-input bg-surface px-4 text-sm outline-none focus:ring-2 focus:ring-ring/40"
                 >
                   <option value="BRL">Real brasileiro (R$)</option>
@@ -155,7 +314,11 @@ function ConfiguracoesPage() {
                 </select>
               </div>
             </div>
-            <Button className="rounded-xl bg-gradient-brand font-semibold">
+            <Button
+              className="rounded-xl bg-gradient-brand font-semibold"
+              onClick={handleSaveProfile}
+              disabled={updateProfileMutation.isPending || !profileForm.name.trim()}
+            >
               Salvar alterações
             </Button>
           </CardContent>
@@ -212,11 +375,78 @@ function ConfiguracoesPage() {
               <div className="flex items-center justify-between">
                 <span>Ocultar saldos</span>
                 <Switch
-                  checked={!!ativas["ocultar"]}
-                  onCheckedChange={() => alternar("ocultar")}
+                  checked={ocultarSaldos}
+                  onCheckedChange={setOcultarSaldos}
                   aria-label="Ocultar saldos"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl border-border/70 shadow-soft">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <BrandMark className="size-5" />
+                Certo IA
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Cadastre sua chave da API da OpenAI para usar o Certo IA com a sua própria conta.
+              </p>
+              {aiKeyStatus?.hasKey ? (
+                <div className="flex items-center justify-between rounded-2xl bg-surface-2 p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
+                      <KeyRound className="size-4" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium">Chave configurada</p>
+                      <p className="text-xs text-muted-foreground">••••••••••••••••</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => removeOpenAiKeyMutation.mutate()}
+                    disabled={removeOpenAiKeyMutation.isPending}
+                  >
+                    Remover
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="relative">
+                    <Input
+                      type={showApiKey ? "text" : "password"}
+                      placeholder="sk-..."
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      className="h-11 rounded-xl pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowApiKey((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      aria-label={showApiKey ? "Ocultar chave" : "Mostrar chave"}
+                    >
+                      {showApiKey ? (
+                        <EyeOff className="size-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="size-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                  <Button
+                    className="w-full rounded-xl bg-gradient-brand font-semibold"
+                    onClick={handleSaveApiKey}
+                    disabled={!apiKeyInput.trim() || saveOpenAiKeyMutation.isPending}
+                  >
+                    Salvar chave
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -232,17 +462,17 @@ function ConfiguracoesPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {notificacoes.map((n) => (
-              <div
-                key={n.id}
-                className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3"
-              >
+              <div key={n.id} className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3">
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium">{n.label}</p>
                   <p className="text-xs text-muted-foreground">{n.detalhe}</p>
                 </div>
                 <Switch
-                  checked={!!ativas[n.id]}
-                  onCheckedChange={() => alternar(n.id)}
+                  checked={currentUser?.[n.id] ?? false}
+                  onCheckedChange={(checked) =>
+                    notificationPrefsMutation.mutate({ [n.id]: checked })
+                  }
+                  disabled={notificationPrefsMutation.isPending}
                   aria-label={n.label}
                 />
               </div>
@@ -268,22 +498,271 @@ function ConfiguracoesPage() {
                   <p className="text-xs text-muted-foreground">{s.detalhe}</p>
                 </div>
                 <Switch
-                  checked={!!ativas[s.id]}
-                  onCheckedChange={() => alternar(s.id)}
+                  checked={currentUser?.[s.id] ?? false}
+                  onCheckedChange={(checked) => securityPrefsMutation.mutate({ [s.id]: checked })}
+                  disabled={securityPrefsMutation.isPending}
                   aria-label={s.label}
                 />
               </div>
             ))}
-            <Button variant="secondary" className="w-full rounded-xl">
+            <Button
+              variant="secondary"
+              className="w-full rounded-xl"
+              onClick={() => setPasswordDialogOpen(true)}
+            >
               Alterar senha
             </Button>
-            <Button variant="ghost" className="w-full rounded-xl text-destructive">
+            <Button
+              variant="ghost"
+              className="w-full rounded-xl text-destructive"
+              onClick={handleLogoutAll}
+              disabled={loggingOutAll}
+            >
               <LogOut className="size-4" aria-hidden="true" />
               Encerrar todas as sessões
             </Button>
           </CardContent>
         </Card>
       </section>
+
+      <Card className="rounded-3xl border-border/70 shadow-soft">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <UserPlus className="size-4 text-primary" aria-hidden="true" />
+            Convidar familiar
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-6 lg:grid-cols-2">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium">Seu código de convite</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Compartilhe este código com um familiar. Quem cadastrar o código passa a
+                visualizar seus lançamentos, cartões, investimentos e metas — somente leitura.
+              </p>
+              {activeInvite ? (
+                <div className="mt-3 space-y-2">
+                  <div className="flex items-center gap-2 rounded-2xl bg-surface-2 p-3">
+                    <span className="flex-1 font-mono text-lg font-semibold tracking-[0.2em]">
+                      {activeInvite.code}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-xl"
+                      aria-label="Copiar código"
+                      onClick={handleCopyCode}
+                    >
+                      <Copy className="size-4" aria-hidden="true" />
+                    </Button>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Expira em {formatDateTime(activeInvite.expiresAt)}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="rounded-xl"
+                      onClick={() => createInviteMutation.mutate()}
+                      disabled={createInviteMutation.isPending}
+                    >
+                      <RefreshCw className="size-3.5" aria-hidden="true" />
+                      Gerar novo código
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="rounded-xl text-destructive"
+                      onClick={() => revokeInviteMutation.mutate(activeInvite.id)}
+                      disabled={revokeInviteMutation.isPending}
+                    >
+                      Revogar
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  className="mt-3 rounded-xl bg-gradient-brand font-semibold"
+                  onClick={() => createInviteMutation.mutate()}
+                  disabled={createInviteMutation.isPending}
+                >
+                  Gerar código de convite
+                </Button>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-medium">Tenho um código</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Cadastre o código recebido de um familiar para visualizar as finanças dele.
+              </p>
+              <div className="mt-3 flex gap-2">
+                <Input
+                  value={redeemCode}
+                  onChange={(e) => setRedeemCode(e.target.value.toUpperCase())}
+                  placeholder="Ex: 7K9QXP4M"
+                  className="h-11 rounded-xl font-mono uppercase tracking-widest"
+                />
+                <Button
+                  type="button"
+                  className="shrink-0 rounded-xl bg-gradient-brand font-semibold"
+                  onClick={handleRedeem}
+                  disabled={!redeemCode.trim() || redeemInviteMutation.isPending}
+                >
+                  Resgatar
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-medium">Quem tem acesso aos seus dados</p>
+              {familyMembers && familyMembers.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {familyMembers.map((grant) => (
+                    <div
+                      key={grant.id}
+                      className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3"
+                    >
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
+                        <Users className="size-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{grant.member?.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {grant.member?.email}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-xl text-destructive"
+                        aria-label="Remover acesso"
+                        onClick={() => revokeGrantMutation.mutate(grant.id)}
+                        disabled={revokeGrantMutation.isPending}
+                      >
+                        <X className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Ninguém tem acesso aos seus dados ainda.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-medium">Contas que você pode visualizar</p>
+              {accessibleAccounts && accessibleAccounts.length > 0 ? (
+                <div className="mt-2 space-y-2">
+                  {accessibleAccounts.map((grant) => (
+                    <div
+                      key={grant.id}
+                      className="flex items-center gap-3 rounded-2xl bg-surface-2 p-3"
+                    >
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
+                        <Users className="size-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-sm font-medium">{grant.owner?.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {grant.owner?.email}
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="rounded-xl text-destructive"
+                        onClick={() => revokeGrantMutation.mutate(grant.id)}
+                        disabled={revokeGrantMutation.isPending}
+                      >
+                        Sair
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Você ainda não tem acesso a nenhuma conta compartilhada.
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Alterar senha</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div>
+              <label htmlFor="current-password" className="text-sm font-medium">
+                Senha atual
+              </label>
+              <Input
+                id="current-password"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                className="mt-2 h-11 rounded-xl"
+              />
+            </div>
+            <div>
+              <label htmlFor="new-password" className="text-sm font-medium">
+                Nova senha
+              </label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                className="mt-2 h-11 rounded-xl"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Mínimo de 8 caracteres, com maiúscula, minúscula, número e caractere especial.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="confirm-password" className="text-sm font-medium">
+                Confirmar nova senha
+              </label>
+              <Input
+                id="confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="mt-2 h-11 rounded-xl"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              className="rounded-xl bg-gradient-brand font-semibold"
+              onClick={handleChangePassword}
+              disabled={
+                changePasswordMutation.isPending ||
+                !currentPassword ||
+                !newPassword ||
+                !confirmPassword
+              }
+            >
+              Salvar nova senha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppShell>
   );
 }

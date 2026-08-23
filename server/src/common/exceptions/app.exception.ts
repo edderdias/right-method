@@ -122,13 +122,21 @@ export class OpenFinanceConnectionNotFoundException extends AppException {
 
 export class OpenFinanceAccountNotFoundException extends AppException {
   constructor() {
-    super("OPEN_FINANCE_ACCOUNT_NOT_FOUND", "Conta conectada não encontrada.", HttpStatus.NOT_FOUND);
+    super(
+      "OPEN_FINANCE_ACCOUNT_NOT_FOUND",
+      "Conta conectada não encontrada.",
+      HttpStatus.NOT_FOUND,
+    );
   }
 }
 
 export class OpenFinanceTransactionNotFoundException extends AppException {
   constructor() {
-    super("OPEN_FINANCE_TRANSACTION_NOT_FOUND", "Movimentação não encontrada.", HttpStatus.NOT_FOUND);
+    super(
+      "OPEN_FINANCE_TRANSACTION_NOT_FOUND",
+      "Movimentação não encontrada.",
+      HttpStatus.NOT_FOUND,
+    );
   }
 }
 
@@ -151,5 +159,223 @@ export class OpenFinanceSyncFailedException extends AppException {
 export class OpenFinanceWebhookUnauthorizedException extends AppException {
   constructor() {
     super("OPEN_FINANCE_WEBHOOK_UNAUTHORIZED", "Webhook não autorizado.", HttpStatus.UNAUTHORIZED);
+  }
+}
+
+export class CreditCardNotFoundException extends AppException {
+  constructor() {
+    super("CREDIT_CARD_NOT_FOUND", "Cartão não encontrado.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class CreditCardReadOnlyException extends AppException {
+  constructor(
+    message = "Cartões conectados via Open Finance preservam os dados enviados pela instituição.",
+  ) {
+    super("CREDIT_CARD_READ_ONLY", message, HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+}
+
+export class CreditCardArchivedException extends AppException {
+  constructor() {
+    super(
+      "CREDIT_CARD_ARCHIVED",
+      "Este cartão está arquivado e não aceita novos lançamentos.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class CreditCardPurchaseNotFoundException extends AppException {
+  constructor() {
+    super("CREDIT_CARD_PURCHASE_NOT_FOUND", "Compra não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class CreditCardPurchaseReadOnlyException extends AppException {
+  constructor(message = "Compras importadas do Open Finance preservam os dados originais.") {
+    super("CREDIT_CARD_PURCHASE_READ_ONLY", message, HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+}
+
+export class CreditCardInvoiceNotFoundException extends AppException {
+  constructor() {
+    super("CREDIT_CARD_INVOICE_NOT_FOUND", "Fatura não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class CreditCardInvoiceAlreadyPaidException extends AppException {
+  constructor() {
+    super("CREDIT_CARD_INVOICE_ALREADY_PAID", "Esta fatura já foi paga.", HttpStatus.CONFLICT);
+  }
+}
+
+export class InvestmentNotFoundException extends AppException {
+  constructor() {
+    super("INVESTMENT_NOT_FOUND", "Investimento não encontrado.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class InvestmentReadOnlyException extends AppException {
+  constructor(
+    message = "Investimentos conectados via Open Finance preservam os dados enviados pela instituição.",
+  ) {
+    super("INVESTMENT_READ_ONLY", message, HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+}
+
+export class InvestmentArchivedException extends AppException {
+  constructor() {
+    super(
+      "INVESTMENT_ARCHIVED",
+      "Este investimento está arquivado e não aceita novos lançamentos.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class InvestmentTransactionNotFoundException extends AppException {
+  constructor() {
+    super("INVESTMENT_TRANSACTION_NOT_FOUND", "Lançamento não encontrado.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class InvestmentInsufficientQuantityException extends AppException {
+  constructor() {
+    super(
+      "INVESTMENT_INSUFFICIENT_QUANTITY",
+      "Quantidade insuficiente para esta venda/resgate.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class InvestmentIncomeNotFoundException extends AppException {
+  constructor() {
+    super("INVESTMENT_INCOME_NOT_FOUND", "Rendimento não encontrado.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class FinancialGoalNotFoundException extends AppException {
+  constructor() {
+    super("FINANCIAL_GOAL_NOT_FOUND", "Meta não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class FinancialGoalArchivedException extends AppException {
+  constructor() {
+    super(
+      "FINANCIAL_GOAL_ARCHIVED",
+      "Esta meta está arquivada e não aceita novos lançamentos.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class GoalTransactionNotFoundException extends AppException {
+  constructor() {
+    super("GOAL_TRANSACTION_NOT_FOUND", "Lançamento não encontrado.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class GoalInsufficientBalanceException extends AppException {
+  constructor(availableAmount: number) {
+    super(
+      "GOAL_INSUFFICIENT_BALANCE",
+      `Não é possível retirar esse valor. Saldo disponível na meta: ${availableAmount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`,
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class GoalInvestmentLinkNotFoundException extends AppException {
+  constructor() {
+    super(
+      "GOAL_INVESTMENT_LINK_NOT_FOUND",
+      "Vínculo entre meta e investimento não encontrado.",
+      HttpStatus.NOT_FOUND,
+    );
+  }
+}
+
+export class GoalInvestmentAlreadyLinkedException extends AppException {
+  constructor() {
+    super(
+      "GOAL_INVESTMENT_ALREADY_LINKED",
+      "Este investimento já está vinculado a esta meta.",
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class AiConversationNotFoundException extends AppException {
+  constructor() {
+    super("AI_CONVERSATION_NOT_FOUND", "Conversa não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
+export class AiApiKeyMissingException extends AppException {
+  constructor() {
+    super(
+      "AI_API_KEY_MISSING",
+      "Configure sua chave da OpenAI em Configurações para usar o Certo IA.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class CurrentPasswordInvalidException extends AppException {
+  constructor() {
+    super("CURRENT_PASSWORD_INVALID", "Senha atual incorreta.", HttpStatus.UNAUTHORIZED);
+  }
+}
+
+export class FamilyInviteNotFoundException extends AppException {
+  constructor() {
+    super(
+      "FAMILY_INVITE_NOT_FOUND",
+      "Código de convite inválido, expirado ou já utilizado.",
+      HttpStatus.NOT_FOUND,
+    );
+  }
+}
+
+export class FamilyInviteSelfRedeemException extends AppException {
+  constructor() {
+    super(
+      "FAMILY_INVITE_SELF_REDEEM",
+      "Você não pode usar seu próprio código de convite.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class FamilyAccessGrantNotFoundException extends AppException {
+  constructor() {
+    super(
+      "FAMILY_ACCESS_GRANT_NOT_FOUND",
+      "Este compartilhamento não foi encontrado.",
+      HttpStatus.NOT_FOUND,
+    );
+  }
+}
+
+export class FamilyAccessDeniedException extends AppException {
+  constructor() {
+    super(
+      "FAMILY_ACCESS_DENIED",
+      "Você não tem mais acesso aos dados deste usuário.",
+      HttpStatus.FORBIDDEN,
+    );
+  }
+}
+
+export class AiProviderException extends AppException {
+  constructor() {
+    super(
+      "AI_PROVIDER_UNAVAILABLE",
+      "O Certo IA está indisponível no momento. Tente novamente em instantes.",
+      HttpStatus.SERVICE_UNAVAILABLE,
+    );
   }
 }

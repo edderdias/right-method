@@ -10,6 +10,7 @@ import type { RequestMetadata } from "../../../common/utils/request-metadata";
 import {
   AccountBlockedException,
   AccountInactiveException,
+  CurrentPasswordInvalidException,
   EmailAlreadyExistsException,
   EmailNotVerifiedException,
   InvalidCredentialsException,
@@ -106,12 +107,14 @@ export class AuthService {
     await this.usersService.updateLastLogin(user.id);
     await this.auditLogService.record(AuditEvent.LOGIN_SUCCESS, metadata, user.id);
 
-    void this.emailService.sendNewLoginAlert(
-      user.email,
-      user.name,
-      metadata.ipAddress,
-      metadata.userAgent,
-    );
+    if (user.newDeviceAlertEnabled) {
+      void this.emailService.sendNewLoginAlert(
+        user.email,
+        user.name,
+        metadata.ipAddress,
+        metadata.userAgent,
+      );
+    }
 
     const tokens = await this.issueTokens(user.id, user.email, user.role, metadata);
     return { ...tokens, user: this.usersService.toPublic(user) };
@@ -187,6 +190,29 @@ export class AuthService {
 
     await this.emailService.sendPasswordChanged(user.email, user.name);
     await this.auditLogService.record(AuditEvent.PASSWORD_RESET, metadata, record.userId);
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+    metadata: RequestMetadata,
+  ): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new CurrentPasswordInvalidException();
+    }
+
+    const passwordValid = await this.passwordService.verify(user.passwordHash, currentPassword);
+    if (!passwordValid) {
+      throw new CurrentPasswordInvalidException();
+    }
+
+    const passwordHash = await this.passwordService.hash(newPassword);
+    await this.usersService.updatePassword(userId, passwordHash);
+
+    await this.emailService.sendPasswordChanged(user.email, user.name);
+    await this.auditLogService.record(AuditEvent.PASSWORD_CHANGED, metadata, userId);
   }
 
   async verifyEmail(token: string, metadata: RequestMetadata): Promise<PublicUser> {

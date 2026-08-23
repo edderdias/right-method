@@ -45,7 +45,11 @@ export class ExpensesService {
 
   async create(userId: string, dto: CreateExpenseDto): Promise<PublicExpense> {
     await this.accountsService.assertOwnership(userId, dto.accountId);
-    await this.categoriesService.assertOwnershipOrGlobal(userId, dto.categoryId, CategoryType.EXPENSE);
+    await this.categoriesService.assertOwnershipOrGlobal(
+      userId,
+      dto.categoryId,
+      CategoryType.EXPENSE,
+    );
 
     const isRecurring = dto.isRecurring ?? false;
     const isInstallment = dto.isInstallment ?? false;
@@ -139,7 +143,11 @@ export class ExpensesService {
       await this.accountsService.assertOwnership(userId, dto.accountId);
     }
     if (dto.categoryId && dto.categoryId !== existing.categoryId) {
-      await this.categoriesService.assertOwnershipOrGlobal(userId, dto.categoryId, CategoryType.EXPENSE);
+      await this.categoriesService.assertOwnershipOrGlobal(
+        userId,
+        dto.categoryId,
+        CategoryType.EXPENSE,
+      );
     }
 
     const oldStatus = existing.status;

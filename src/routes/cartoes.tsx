@@ -1,23 +1,19 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { CreditCard, Plus, Trash2, Wifi } from "lucide-react";
 
-import { requireAuth } from "@/lib/auth";
-import { useMemo, useState } from "react";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { CalendarClock, CreditCard, Lock, Plus, ShieldCheck, Wifi } from "lucide-react";
-
-import { AppShell, brl } from "@/components/app-shell";
+import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArchiveCreditCardDialog } from "@/components/cartoes/archive-credit-card-dialog";
+import { NewCreditCardDialog } from "@/components/cartoes/new-credit-card-dialog";
+import { useCreditCards, useCreditCardsSummary } from "@/hooks/use-credit-cards";
+import { requireAuth } from "@/lib/auth";
+import { formatBRL } from "@/lib/finance-format";
 import { cn } from "@/lib/utils";
+import type { CreditCard as CreditCardModel } from "@/types/credit-card";
 
 export const Route = createFileRoute("/cartoes")({
   beforeLoad: requireAuth,
@@ -32,7 +28,7 @@ export const Route = createFileRoute("/cartoes")({
       { property: "og:title", content: "Cartões de crédito | Método Certo" },
       {
         property: "og:description",
-        content: "Fatura atual, limite disponível, melhor dia de compra e gastos por cartão.",
+        content: "Fatura atual, limite disponível e compras dos seus cartões.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -41,88 +37,134 @@ export const Route = createFileRoute("/cartoes")({
   component: CartoesPage,
 });
 
-const cartoes = [
-  {
-    id: "certo-black",
-    nome: "Certo Black",
-    bandeira: "Mastercard",
-    final: "4821",
-    limite: 12000,
-    fatura: 3480,
-    vencimento: "12/08",
-    fechamento: "04/08",
-    gradiente: "bg-gradient-brand",
-  },
-  {
-    id: "certo-gold",
-    nome: "Certo Gold",
-    bandeira: "Visa",
-    final: "7702",
-    limite: 6000,
-    fatura: 1290,
-    vencimento: "18/08",
-    fechamento: "10/08",
-    gradiente: "bg-gradient-to-br from-info to-primary",
-  },
-  {
-    id: "loja-flex",
-    nome: "Loja Flex",
-    bandeira: "Elo",
-    final: "1194",
-    limite: 2500,
-    fatura: 640,
-    vencimento: "22/08",
-    fechamento: "15/08",
-    gradiente: "bg-gradient-to-br from-warning to-destructive",
-  },
-];
+function EmptyCardsState({ onNewCard }: { onNewCard: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-12 text-center">
+      <span className="grid size-14 place-items-center rounded-2xl bg-primary/12 text-primary">
+        <CreditCard className="size-7" aria-hidden="true" />
+      </span>
+      <div>
+        <p className="text-sm font-semibold">Você ainda não possui cartões cadastrados.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Conecte um cartão via Open Finance ou cadastre manualmente.
+        </p>
+      </div>
+      <Button onClick={onNewCard} className="rounded-xl bg-gradient-brand font-semibold">
+        <Plus className="size-4" aria-hidden="true" />
+        Novo cartão
+      </Button>
+    </div>
+  );
+}
 
-const faturasHistorico = [
-  { mes: "Mar", valor: 4100 },
-  { mes: "Abr", valor: 3850 },
-  { mes: "Mai", valor: 4620 },
-  { mes: "Jun", valor: 4180 },
-  { mes: "Jul", valor: 5240 },
-  { mes: "Ago", valor: 5410 },
-];
+function CreditCardTile({ card, onArchive }: { card: CreditCardModel; onArchive: () => void }) {
+  const navigate = useNavigate();
+  const limit = card.creditLimit ?? 0;
+  const available = card.availableLimit ?? limit;
+  const used = Math.max(0, limit - available);
+  const usedPct = limit > 0 ? Math.round((used / limit) * 100) : 0;
 
-const lancamentos: Record<string, { desc: string; cat: string; data: string; valor: number }[]> = {
-  "certo-black": [
-    { desc: "Supermercado Pão Real", cat: "Mercado", data: "02/08", valor: 612 },
-    { desc: "Assinatura streaming", cat: "Lazer", data: "05/08", valor: 55 },
-    { desc: "Passagem aérea", cat: "Viagem", data: "08/08", valor: 1290 },
-    { desc: "Restaurante Nikkei", cat: "Alimentação", data: "11/08", valor: 268 },
-  ],
-  "certo-gold": [
-    { desc: "Farmácia Bem Estar", cat: "Saúde", data: "03/08", valor: 148 },
-    { desc: "Posto Ipiranga", cat: "Transporte", data: "07/08", valor: 320 },
-    { desc: "Curso de inglês", cat: "Educação", data: "09/08", valor: 420 },
-  ],
-  "loja-flex": [
-    { desc: "Tênis de corrida", cat: "Vestuário", data: "06/08", valor: 399 },
-    { desc: "Utensílios de cozinha", cat: "Casa", data: "13/08", valor: 241 },
-  ],
-};
+  return (
+    <Card
+      className="cursor-pointer rounded-3xl border-border/70 shadow-soft transition-colors hover:bg-surface"
+      onClick={() => navigate({ to: "/cartoes/$cardId", params: { cardId: card.id } })}
+    >
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary">
+              <CreditCard className="size-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{card.institutionName ?? card.name}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {card.name !== card.institutionName ? `${card.name} · ` : ""}
+                {card.brand ?? "—"}
+                {card.lastFourDigits ? ` · •••• ${card.lastFourDigits}` : ""}
+              </p>
+            </div>
+          </div>
+          {card.source === "MANUAL" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 rounded-lg text-destructive hover:text-destructive"
+              aria-label="Excluir cartão"
+              onClick={(event) => {
+                event.stopPropagation();
+                onArchive();
+              }}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          )}
+        </div>
+
+        {limit > 0 ? (
+          <div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Limite utilizado</span>
+              <span>{usedPct}%</span>
+            </div>
+            <Progress value={usedPct} className="mt-2 h-2" />
+            <p className="mt-2 text-sm font-semibold">
+              {formatBRL(used)}{" "}
+              <span className="font-normal text-muted-foreground">/ {formatBRL(limit)}</span>
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground">Limite não disponível</p>
+        )}
+
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+            card.source === "OPEN_FINANCE" ? "bg-primary/12 text-primary" : "bg-info/12 text-info",
+          )}
+        >
+          {card.source === "OPEN_FINANCE" ? (
+            <>
+              <Wifi className="size-3" aria-hidden="true" /> Open Finance
+            </>
+          ) : (
+            "Cadastro manual"
+          )}
+        </span>
+
+        <Button variant="secondary" className="w-full rounded-xl">
+          Ver cartão
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 function CartoesPage() {
-  const [selecionado, setSelecionado] = useState(cartoes[0]!.id);
-  const cartao = useMemo(() => cartoes.find((c) => c.id === selecionado)!, [selecionado]);
+  const cardsQuery = useCreditCards();
+  const summaryQuery = useCreditCardsSummary();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [archiving, setArchiving] = useState<CreditCardModel | null>(null);
 
-  const totalFatura = cartoes.reduce((s, c) => s + c.fatura, 0);
-  const totalLimite = cartoes.reduce((s, c) => s + c.limite, 0);
-  const disponivel = totalLimite - totalFatura;
-  const usoPct = Math.round((totalFatura / totalLimite) * 100);
+  const cards = cardsQuery.data ?? [];
+  const summary = summaryQuery.data;
+  const usedPct =
+    summary && summary.totalLimit > 0
+      ? Math.round((summary.totalUsed / summary.totalLimit) * 100)
+      : 0;
 
   return (
     <AppShell>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Cartões</h1>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Cartões de crédito</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Faturas, limites e lançamentos de agosto.
+            Limites, faturas e compras de todos os seus cartões em um só lugar.
           </p>
         </div>
-        <Button className="rounded-xl bg-gradient-brand font-semibold">
+        <Button
+          onClick={() => setDialogOpen(true)}
+          className="rounded-xl bg-gradient-brand font-semibold"
+        >
           <Plus className="size-4" aria-hidden="true" />
           Novo cartão
         </Button>
@@ -131,144 +173,85 @@ function CartoesPage() {
       <section className="grid gap-4 sm:grid-cols-3">
         <Card className="rounded-3xl border-border/70 bg-gradient-surface shadow-soft">
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Fatura total</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight">{brl(totalFatura)}</p>
-            <p className="mt-3 text-xs text-muted-foreground">{cartoes.length} cartões ativos</p>
+            <p className="text-sm text-muted-foreground">Limite total</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="mt-2 h-8 w-32" />
+            ) : (
+              <p className="mt-1 text-2xl font-semibold tracking-tight">
+                {formatBRL(summary?.totalLimit ?? 0)}
+              </p>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">{cards.length} cartões ativos</p>
           </CardContent>
         </Card>
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Limite disponível</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight text-primary">
-              {brl(disponivel)}
-            </p>
-            <Progress value={usoPct} className="mt-3 h-2" />
-            <p className="mt-2 text-xs text-muted-foreground">{usoPct}% do limite utilizado</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="mt-2 h-8 w-32" />
+            ) : (
+              <p className="mt-1 text-2xl font-semibold tracking-tight text-primary">
+                {formatBRL(summary?.totalAvailable ?? 0)}
+              </p>
+            )}
+            <Progress value={usedPct} className="mt-3 h-2" />
+            <p className="mt-2 text-xs text-muted-foreground">{usedPct}% do limite utilizado</p>
           </CardContent>
         </Card>
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Próximo vencimento</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight">12/08</p>
-            <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-warning/15 px-2 py-1 text-xs font-medium text-warning">
-              <CalendarClock className="size-3" aria-hidden="true" /> Certo Black · {brl(3480)}
-            </span>
+            <p className="text-sm text-muted-foreground">Faturas em aberto</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="mt-2 h-8 w-32" />
+            ) : (
+              <p className="mt-1 text-2xl font-semibold tracking-tight">
+                {formatBRL(summary?.openInvoicesTotal ?? 0)}
+              </p>
+            )}
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <div className="space-y-4 xl:col-span-1">
-          {cartoes.map((c) => {
-            const pct = Math.round((c.fatura / c.limite) * 100);
-            const ativo = c.id === selecionado;
-            return (
-              <button
-                key={c.id}
-                type="button"
-                onClick={() => setSelecionado(c.id)}
-                aria-pressed={ativo}
-                className={cn(
-                  "w-full rounded-3xl p-5 text-left text-primary-foreground shadow-brand transition-transform",
-                  c.gradiente,
-                  ativo ? "scale-[1.02]" : "opacity-80 hover:opacity-100",
-                )}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{c.nome}</span>
-                  <Wifi className="size-4 rotate-90" aria-hidden="true" />
-                </div>
-                <p className="mt-6 font-mono text-lg tracking-[0.2em]">•••• {c.final}</p>
-                <div className="mt-4 flex items-end justify-between text-xs">
-                  <div>
-                    <p className="opacity-80">Fatura atual</p>
-                    <p className="text-base font-semibold">{brl(c.fatura)}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="opacity-80">{c.bandeira}</p>
-                    <p>{pct}% do limite</p>
-                  </div>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="space-y-4 xl:col-span-2">
+      <section>
+        {cardsQuery.isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-56 w-full rounded-3xl" />
+            ))}
+          </div>
+        ) : cardsQuery.isError ? (
           <Card className="rounded-3xl border-border/70 shadow-soft">
-            <CardHeader className="flex-row items-center justify-between">
-              <CardTitle className="text-base font-semibold">Histórico de faturas</CardTitle>
-              <span className="text-xs text-muted-foreground">Últimos 6 meses</span>
-            </CardHeader>
-            <CardContent className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={faturasHistorico}>
-                  <CartesianGrid vertical={false} stroke="var(--border)" />
-                  <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
-                  <YAxis
-                    tickLine={false}
-                    axisLine={false}
-                    fontSize={12}
-                    tickFormatter={(v: number) => `${v / 1000}k`}
-                  />
-                  <Tooltip
-                    cursor={{ fill: "var(--surface-2)" }}
-                    formatter={(v: number) => brl(v)}
-                    contentStyle={{
-                      borderRadius: 12,
-                      border: "1px solid var(--border)",
-                      background: "var(--popover)",
-                    }}
-                  />
-                  <Bar dataKey="valor" fill="var(--chart-2)" radius={[8, 8, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+            <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Não foi possível carregar seus cartões.
+              </p>
+              <Button variant="outline" onClick={() => cardsQuery.refetch()}>
+                Tentar novamente
+              </Button>
             </CardContent>
           </Card>
-
+        ) : cards.length === 0 ? (
           <Card className="rounded-3xl border-border/70 shadow-soft">
-            <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
-              <CardTitle className="text-base font-semibold">
-                Lançamentos · {cartao.nome}
-              </CardTitle>
-              <span className="text-xs text-muted-foreground">
-                Fecha em {cartao.fechamento} · vence em {cartao.vencimento}
-              </span>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {lancamentos[cartao.id]!.map((l) => (
-                <div
-                  key={l.desc}
-                  className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3"
-                >
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-info/15 text-info">
-                      <CreditCard className="size-4" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{l.desc}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {l.cat} · {l.data}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 text-sm font-semibold">-{brl(l.valor)}</span>
-                </div>
-              ))}
-              <div className="flex flex-wrap items-center gap-2 pt-2">
-                <Button variant="secondary" className="rounded-xl">
-                  <ShieldCheck className="size-4" aria-hidden="true" />
-                  Pagar fatura
-                </Button>
-                <Button variant="ghost" className="rounded-xl">
-                  <Lock className="size-4" aria-hidden="true" />
-                  Bloquear cartão
-                </Button>
-              </div>
+            <CardContent>
+              <EmptyCardsState onNewCard={() => setDialogOpen(true)} />
             </CardContent>
           </Card>
-        </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {cards.map((card) => (
+              <CreditCardTile key={card.id} card={card} onArchive={() => setArchiving(card)} />
+            ))}
+          </div>
+        )}
       </section>
+
+      <NewCreditCardDialog open={dialogOpen} onOpenChange={setDialogOpen} />
+      <ArchiveCreditCardDialog
+        card={archiving}
+        onOpenChange={(open) => {
+          if (!open) setArchiving(null);
+        }}
+      />
     </AppShell>
   );
 }

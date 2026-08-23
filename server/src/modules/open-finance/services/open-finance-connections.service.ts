@@ -62,8 +62,11 @@ export class OpenFinanceConnectionsService {
     const importedExternalIds = new Set(
       connection.accounts.map((account) => account.externalAccountId),
     );
+    // CREDIT-type accounts are handled by the Cartões module (OpenFinanceCreditCardsService),
+    // not imported here as bank accounts — keeps a card from ever being offered twice.
     const availableAccounts = pluggyAccounts.filter(
-      (pluggyAccount) => !importedExternalIds.has(pluggyAccount.id),
+      (pluggyAccount) =>
+        pluggyAccount.type === "BANK" && !importedExternalIds.has(pluggyAccount.id),
     );
 
     return { connection, availableAccounts };
@@ -89,7 +92,8 @@ export class OpenFinanceConnectionsService {
 
     for (const externalAccountId of externalAccountIds) {
       const pluggyAccount = byId.get(externalAccountId);
-      if (!pluggyAccount) continue;
+      // Defense in depth: CREDIT accounts only ever get imported via the Cartões module.
+      if (!pluggyAccount || pluggyAccount.type !== "BANK") continue;
 
       const created = await this.prisma.connectedAccount.upsert({
         where: {

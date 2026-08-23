@@ -4,6 +4,8 @@ import {
   ArrowDownRight,
   Bell,
   CalendarClock,
+  Check,
+  ChevronDown,
   CreditCard,
   LayoutDashboard,
   LineChart,
@@ -13,11 +15,22 @@ import {
   Sparkles,
   Target,
   TrendingUp,
+  Users,
   Wallet,
 } from "lucide-react";
 
 import { BrandLockup, BrandMark } from "@/components/brand";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useFamilyView } from "@/hooks/use-family-view";
+import { useCurrentUser } from "@/hooks/use-user-settings";
 import { clearSession } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 
@@ -41,9 +54,21 @@ const inactive =
   "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
 const active = "bg-sidebar-accent text-sidebar-primary";
 
+function initialsOf(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? "";
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? "") : "";
+  return (first + last).toUpperCase() || "?";
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const navigate = useNavigate();
+  const { data: currentUser } = useCurrentUser();
+  const { viewAsUserId, viewingOwner, accessibleAccounts, switchTo } = useFamilyView();
+
+  const displayName = viewingOwner?.name ?? currentUser?.name ?? "Minha conta";
+  const displayInitials = initialsOf(displayName);
 
   function handleLogout() {
     clearSession();
@@ -111,17 +136,71 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Button variant="ghost" size="icon" className="rounded-xl" aria-label="Notificações">
                 <Bell className="size-5" />
               </Button>
-              <div className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5">
-                <span className="grid size-8 place-items-center rounded-lg bg-gradient-brand text-xs font-semibold text-primary-foreground">
-                  MC
-                </span>
-                <div className="hidden text-left sm:block">
-                  <p className="text-sm font-medium leading-none">Marina Costa</p>
-                  <p className="text-xs text-muted-foreground">Plano Premium</p>
-                </div>
-              </div>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-2 rounded-xl bg-surface-2 px-3 py-1.5 outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                  >
+                    <span className="grid size-8 place-items-center rounded-lg bg-gradient-brand text-xs font-semibold text-primary-foreground">
+                      {displayInitials}
+                    </span>
+                    <div className="hidden text-left sm:block">
+                      <p className="text-sm font-medium leading-none">{displayName}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {viewingOwner ? "Visualizando (somente leitura)" : "Minha conta"}
+                      </p>
+                    </div>
+                    {accessibleAccounts.length > 0 && (
+                      <ChevronDown className="size-4 text-muted-foreground" aria-hidden="true" />
+                    )}
+                  </button>
+                </DropdownMenuTrigger>
+                {accessibleAccounts.length > 0 && (
+                  <DropdownMenuContent align="end" className="w-64">
+                    <DropdownMenuLabel className="flex items-center gap-2">
+                      <Users className="size-4" aria-hidden="true" />
+                      Visualizar conta
+                    </DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={() => switchTo(null)} className="justify-between">
+                      Minha conta
+                      {!viewAsUserId && <Check className="size-4" aria-hidden="true" />}
+                    </DropdownMenuItem>
+                    {accessibleAccounts.map((grant) => (
+                      <DropdownMenuItem
+                        key={grant.id}
+                        onClick={() => switchTo(grant.ownerId)}
+                        className="justify-between"
+                      >
+                        <span className="truncate">{grant.owner?.name}</span>
+                        {viewAsUserId === grant.ownerId && (
+                          <Check className="size-4 shrink-0" aria-hidden="true" />
+                        )}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                )}
+              </DropdownMenu>
             </div>
           </header>
+
+          {viewingOwner && (
+            <div className="mx-auto w-full max-w-7xl px-4 pt-4 sm:px-6">
+              <div className="flex items-center gap-2 rounded-2xl border border-primary/30 bg-primary/10 px-4 py-2.5 text-sm text-primary">
+                <Users className="size-4 shrink-0" aria-hidden="true" />
+                Você está visualizando os dados de <strong>{viewingOwner.name}</strong> em modo
+                somente leitura.
+                <button
+                  type="button"
+                  onClick={() => switchTo(null)}
+                  className="ml-auto font-medium underline underline-offset-2 hover:text-primary/80"
+                >
+                  Voltar para minha conta
+                </button>
+              </div>
+            </div>
+          )}
 
           <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">{children}</main>
         </div>

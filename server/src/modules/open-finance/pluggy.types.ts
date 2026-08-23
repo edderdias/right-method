@@ -24,6 +24,21 @@ export interface PluggyItem {
 
 export type PluggyAccountType = "BANK" | "CREDIT";
 
+/** https://docs.pluggy.ai/reference/accounts-retrieve — only present when `type === "CREDIT"`. */
+export interface PluggyCreditData {
+  level?: string | null;
+  brand?: string | null;
+  brandAdditionalInfo?: string | null;
+  balanceCloseDate?: string | null;
+  balanceDueDate?: string | null;
+  availableCreditLimit?: number | null;
+  creditLimit?: number | null;
+  minimumPayment?: number | null;
+  isLimitFlexible?: boolean | null;
+  status?: "ACTIVE" | "BLOCKED" | "CANCELLED" | null;
+  holderType?: "MAIN" | "ADDITIONAL" | null;
+}
+
 export interface PluggyAccount {
   id: string;
   itemId: string;
@@ -34,6 +49,7 @@ export interface PluggyAccount {
   marketingName?: string | null;
   balance: number;
   currencyCode: string;
+  creditData?: PluggyCreditData | null;
 }
 
 interface PluggyPaginated<T> {
@@ -47,6 +63,21 @@ export type PluggyAccountsResponse = PluggyPaginated<PluggyAccount>;
 
 export type PluggyTransactionType = "CREDIT" | "DEBIT";
 
+/** https://docs.pluggy.ai/reference/transactions-retrieve — only present for CREDIT account
+ * transactions. Billing association happens exclusively via `billId`/`billForecastDate`, there is
+ * no separate `invoiceId` field. */
+export interface PluggyCreditCardMetadata {
+  installmentNumber?: number | null;
+  totalInstallments?: number | null;
+  totalAmount?: number | null;
+  billId?: string | null;
+  /** Forecasted bill period as "YYYY-MM", present for still-open/future installments. */
+  billForecastDate?: string | null;
+  purchaseDate?: string | null;
+  cardNumber?: string | null;
+  payeeMCC?: number | null;
+}
+
 export interface PluggyTransaction {
   id: string;
   accountId: string;
@@ -58,10 +89,22 @@ export interface PluggyTransaction {
   status: "PENDING" | "POSTED";
   merchant?: { name?: string | null } | null;
   category?: string | null;
+  creditCardMetadata?: PluggyCreditCardMetadata | null;
 }
 
 export interface PluggyTransactionsResponse {
   results: PluggyTransaction[];
   /** Cursor for the next page, or null when there is no more data. */
   next: string | null;
+}
+
+/** https://docs.pluggy.ai/reference/bills-retrieve */
+export interface PluggyBill {
+  id: string;
+  dueDate: string;
+  billClosingDate?: string | null;
+  totalAmount: number;
+  totalAmountCurrencyCode: string;
+  minimumPaymentAmount?: number | null;
+  allowsInstallments?: boolean | null;
 }

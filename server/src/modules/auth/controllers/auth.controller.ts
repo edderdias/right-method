@@ -6,6 +6,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Req,
 } from "@nestjs/common";
@@ -24,6 +25,7 @@ import { LoginDto } from "../dto/login.dto";
 import { RefreshTokenDto } from "../dto/refresh-token.dto";
 import { ForgotPasswordDto } from "../dto/forgot-password.dto";
 import { ResetPasswordDto } from "../dto/reset-password.dto";
+import { ChangePasswordDto } from "../dto/change-password.dto";
 import { VerifyEmailDto } from "../dto/verify-email.dto";
 import { ResendVerificationDto } from "../dto/resend-verification.dto";
 
@@ -121,6 +123,24 @@ export class AuthController {
   async resendVerification(@Body() dto: ResendVerificationDto, @Req() req: Request) {
     await this.authService.resendVerification(dto.email, getRequestMetadata(req));
     return GENERIC_OK;
+  }
+
+  @HttpCode(HttpStatus.OK)
+  @Patch("password")
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "Altera a senha do usuário autenticado" })
+  async changePassword(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: ChangePasswordDto,
+    @Req() req: Request,
+  ) {
+    await this.authService.changePassword(
+      user.sub,
+      dto.currentPassword,
+      dto.newPassword,
+      getRequestMetadata(req),
+    );
+    return { message: "Senha alterada com sucesso." };
   }
 
   @Get("me")

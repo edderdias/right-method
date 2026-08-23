@@ -2,6 +2,36 @@ const API_BASE_URL =
   (import.meta.env["VITE_API_URL"] as string | undefined) ?? "http://localhost:3333/api";
 
 const ACCESS_TOKEN_KEY = "mc_access_token";
+const VIEW_AS_STORAGE_KEY = "mc_view_as_user_id";
+
+/** Endpoints that must always reflect the logged-in user's own identity, even while
+ * "viewing as" a family member's shared account. */
+const VIEW_AS_EXCLUDED_PREFIXES = ["/auth", "/users", "/family"];
+
+let viewAsUserId: string | null =
+  typeof window === "undefined" ? null : localStorage.getItem(VIEW_AS_STORAGE_KEY);
+const viewAsListeners = new Set<() => void>();
+
+export function getViewAsUserId(): string | null {
+  return viewAsUserId;
+}
+
+export function setViewAsUserId(userId: string | null): void {
+  viewAsUserId = userId;
+  if (typeof window !== "undefined") {
+    if (userId) {
+      localStorage.setItem(VIEW_AS_STORAGE_KEY, userId);
+    } else {
+      localStorage.removeItem(VIEW_AS_STORAGE_KEY);
+    }
+  }
+  for (const listener of viewAsListeners) listener();
+}
+
+export function subscribeViewAsUserId(listener: () => void): () => void {
+  viewAsListeners.add(listener);
+  return () => viewAsListeners.delete(listener);
+}
 
 export class ApiError extends Error {
   status: number;
@@ -81,17 +111,34 @@ export async function apiGet<T>(
   path: string,
   params?: Record<string, string | number | boolean | undefined>,
 ): Promise<T> {
-  return request<T>("GET", `${path}${buildQueryString(params)}`);
+  const effectiveParams =
+    viewAsUserId && !VIEW_AS_EXCLUDED_PREFIXES.some((prefix) => path.startsWith(prefix))
+      ? { ...params, viewAs: viewAsUserId }
+      : params;
+  return request<T>("GET", `${path}${buildQueryString(effectiveParams)}`);
+}
+
+function assertNotViewingAsSomeoneElse(path: string): void {
+  if (viewAsUserId && !VIEW_AS_EXCLUDED_PREFIXES.some((prefix) => path.startsWith(prefix))) {
+    throw new ApiError(
+      "Não é possível alterar dados enquanto visualiza a conta de outro usuário.",
+      403,
+      "FORBIDDEN",
+    );
+  }
 }
 
 export async function apiPost<T>(path: string, body: unknown): Promise<T> {
+  assertNotViewingAsSomeoneElse(path);
   return request<T>("POST", path, body);
 }
 
 export async function apiPatch<T>(path: string, body: unknown): Promise<T> {
+  assertNotViewingAsSomeoneElse(path);
   return request<T>("PATCH", path, body);
 }
 
 export async function apiDelete<T>(path: string): Promise<T> {
+  assertNotViewingAsSomeoneElse(path);
   return request<T>("DELETE", path);
 }

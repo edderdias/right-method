@@ -50,7 +50,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { BankTransaction, BankTransactionType } from "@/types/open-finance";
 
-export const Route = createFileRoute("/contas/$accountId")({
+export const Route = createFileRoute("/contas_/$accountId")({
   beforeLoad: requireAuth,
   head: () => ({
     meta: [

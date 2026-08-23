@@ -7,6 +7,7 @@ import { OpenFinanceSyncService } from "./services/open-finance-sync.service";
 import { OpenFinanceConnectionsService } from "./services/open-finance-connections.service";
 import { OpenFinanceAccountsService } from "./services/open-finance-accounts.service";
 import { OpenFinanceTransactionsService } from "./services/open-finance-transactions.service";
+import { OpenFinanceCreditCardsService } from "./services/open-finance-credit-cards.service";
 
 @Module({
   imports: [AuditModule],
@@ -18,6 +19,7 @@ import { OpenFinanceTransactionsService } from "./services/open-finance-transact
     OpenFinanceConnectionsService,
     OpenFinanceAccountsService,
     OpenFinanceTransactionsService,
+    OpenFinanceCreditCardsService,
   ],
   exports: [OpenFinanceAccountsService],
 })

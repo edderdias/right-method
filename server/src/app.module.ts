@@ -14,6 +14,13 @@ import { RevenuesModule } from "./modules/revenues/revenues.module";
 import { ExpensesModule } from "./modules/expenses/expenses.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { OpenFinanceModule } from "./modules/open-finance/open-finance.module";
+import { CreditCardsModule } from "./modules/credit-cards/credit-cards.module";
+import { InvestmentsModule } from "./modules/investments/investments.module";
+import { FinancialGoalsModule } from "./modules/financial-goals/financial-goals.module";
+import { ReportsModule } from "./modules/reports/reports.module";
+import { AiModule } from "./modules/ai/ai.module";
+import { FamilyModule } from "./modules/family/family.module";
+import { FamilyAccessGuard } from "./modules/family/guards/family-access.guard";
 
 @Module({
   imports: [
@@ -27,10 +34,17 @@ import { OpenFinanceModule } from "./modules/open-finance/open-finance.module";
     ExpensesModule,
     DashboardModule,
     OpenFinanceModule,
+    CreditCardsModule,
+    InvestmentsModule,
+    FinancialGoalsModule,
+    ReportsModule,
+    AiModule,
+    FamilyModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
     { provide: APP_GUARD, useClass: JwtAuthGuard },
+    { provide: APP_GUARD, useClass: FamilyAccessGuard },
     { provide: APP_FILTER, useClass: AllExceptionsFilter },
     { provide: APP_INTERCEPTOR, useClass: TransformInterceptor },
   ],

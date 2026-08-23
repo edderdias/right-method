@@ -64,6 +64,12 @@ export async function resendVerification(email: string): Promise<string> {
   return message;
 }
 
+export async function logoutAllSessions(): Promise<string> {
+  const { message } = await apiPost<RegisterResponse>("/auth/logout-all", {});
+  clearSession();
+  return message;
+}
+
 export function requireAuth(): void {
   if (typeof window !== "undefined" && !isAuthenticated()) {
     throw redirect({ to: "/" });

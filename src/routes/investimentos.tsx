@@ -1,26 +1,20 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useState } from "react";
+import { ArrowDownRight, ArrowUpRight, LineChart, Plus, Trash2, Wifi } from "lucide-react";
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
-import { requireAuth } from "@/lib/auth";
-import { useMemo, useState } from "react";
-import {
-  Area,
-  AreaChart,
-  Cell,
-  CartesianGrid,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
-import { ArrowUpRight, Bitcoin, Building2, Landmark, LineChart, Plus, Sparkles } from "lucide-react";
-
-import { AppShell, brl } from "@/components/app-shell";
+import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ArchiveInvestmentDialog } from "@/components/investimentos/archive-investment-dialog";
+import { InvestmentFormDialog } from "@/components/investimentos/investment-form-dialog";
+import { INVESTMENT_TYPE_LABELS } from "@/components/investimentos/investment-type-meta";
+import { useInvestments, useInvestmentsSummary } from "@/hooks/use-investments";
+import { requireAuth } from "@/lib/auth";
+import { formatBRL } from "@/lib/finance-format";
 import { cn } from "@/lib/utils";
+import type { Investment } from "@/types/investment";
 
 export const Route = createFileRoute("/investimentos")({
   beforeLoad: requireAuth,
@@ -29,13 +23,12 @@ export const Route = createFileRoute("/investimentos")({
       { title: "Investimentos | Método Certo" },
       {
         name: "description",
-        content:
-          "Acompanhe patrimônio, rentabilidade e alocação da sua carteira de renda fixa, ações, FIIs e cripto.",
+        content: "Acompanhe sua carteira, aportes, resgates e rendimentos em um só lugar.",
       },
-      { property: "og:title", content: "Carteira de investimentos | Método Certo" },
+      { property: "og:title", content: "Investimentos | Método Certo" },
       {
         property: "og:description",
-        content: "Evolução do patrimônio, alocação por classe e desempenho dos seus ativos.",
+        content: "Patrimônio investido, rentabilidade e alocação da sua carteira.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -44,43 +37,147 @@ export const Route = createFileRoute("/investimentos")({
   component: InvestimentosPage,
 });
 
-const patrimonio = [
-  { mes: "Mar", valor: 74200 },
-  { mes: "Abr", valor: 76800 },
-  { mes: "Mai", valor: 79500 },
-  { mes: "Jun", valor: 81300 },
-  { mes: "Jul", valor: 85100 },
-  { mes: "Ago", valor: 89400 },
+const ALLOCATION_CHART_COLORS = [
+  "var(--chart-1)",
+  "var(--chart-2)",
+  "var(--chart-3)",
+  "var(--chart-4)",
+  "var(--chart-5)",
 ];
 
-const classes = [
-  { nome: "Renda fixa", valor: 38400, cor: "var(--chart-1)", icon: Landmark },
-  { nome: "Ações", valor: 24800, cor: "var(--chart-2)", icon: LineChart },
-  { nome: "FIIs", valor: 18200, cor: "var(--chart-3)", icon: Building2 },
-  { nome: "Cripto", valor: 8000, cor: "var(--chart-4)", icon: Bitcoin },
-];
+function EmptyInvestmentsState({ onNewInvestment }: { onNewInvestment: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-12 text-center">
+      <span className="grid size-14 place-items-center rounded-2xl bg-primary/12 text-primary">
+        <LineChart className="size-7" aria-hidden="true" />
+      </span>
+      <div>
+        <p className="text-sm font-semibold">Você ainda não possui investimentos cadastrados.</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Comece adicionando seu primeiro investimento manualmente.
+        </p>
+      </div>
+      <Button onClick={onNewInvestment} className="rounded-xl bg-gradient-brand font-semibold">
+        <Plus className="size-4" aria-hidden="true" />
+        Novo investimento
+      </Button>
+    </div>
+  );
+}
 
-const filtros = ["Todos", "Renda fixa", "Ações", "FIIs", "Cripto"] as const;
+function InvestmentTile({
+  investment,
+  onArchive,
+}: {
+  investment: Investment;
+  onArchive: () => void;
+}) {
+  const navigate = useNavigate();
+  const returnValue = investment.currentValue - investment.investedAmount;
+  const returnPct =
+    investment.investedAmount > 0 ? (returnValue / investment.investedAmount) * 100 : 0;
+  const positive = returnValue >= 0;
 
-const ativos = [
-  { nome: "Tesouro Selic 2029", classe: "Renda fixa", valor: 21400, rent: 0.92 },
-  { nome: "CDB Banco Certo 118%", classe: "Renda fixa", valor: 17000, rent: 1.04 },
-  { nome: "ITSA4", classe: "Ações", valor: 9200, rent: 2.8 },
-  { nome: "WEGE3", classe: "Ações", valor: 8400, rent: -1.4 },
-  { nome: "BBAS3", classe: "Ações", valor: 7200, rent: 3.6 },
-  { nome: "HGLG11", classe: "FIIs", valor: 10200, rent: 1.1 },
-  { nome: "MXRF11", classe: "FIIs", valor: 8000, rent: 0.8 },
-  { nome: "Bitcoin", classe: "Cripto", valor: 8000, rent: 6.2 },
-];
+  return (
+    <Card
+      className="cursor-pointer rounded-3xl border-border/70 shadow-soft transition-colors hover:bg-surface"
+      onClick={() =>
+        navigate({ to: "/investimentos/$investmentId", params: { investmentId: investment.id } })
+      }
+    >
+      <CardContent className="space-y-4 p-5">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary">
+              <LineChart className="size-5" aria-hidden="true" />
+            </span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold">{investment.name}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {INVESTMENT_TYPE_LABELS[investment.type]}
+                {investment.institutionName ? ` · ${investment.institutionName}` : ""}
+              </p>
+            </div>
+          </div>
+          {investment.source === "MANUAL" && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0 rounded-lg text-destructive hover:text-destructive"
+              aria-label="Excluir investimento"
+              onClick={(event) => {
+                event.stopPropagation();
+                onArchive();
+              }}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          )}
+        </div>
+
+        <div>
+          <p className="text-xs text-muted-foreground">Valor atual</p>
+          <p className="text-lg font-semibold">{formatBRL(investment.currentValue)}</p>
+          <p className="mt-1 flex items-center gap-1 text-xs">
+            <span
+              className={cn(
+                "flex items-center gap-1 font-medium",
+                positive ? "text-primary" : "text-destructive",
+              )}
+            >
+              {positive ? (
+                <ArrowUpRight className="size-3" aria-hidden="true" />
+              ) : (
+                <ArrowDownRight className="size-3" aria-hidden="true" />
+              )}
+              {positive ? "+" : ""}
+              {returnPct.toFixed(2)}%
+            </span>
+            <span className="text-muted-foreground">
+              de {formatBRL(investment.investedAmount)} aplicados
+            </span>
+          </p>
+        </div>
+
+        <span
+          className={cn(
+            "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium",
+            investment.source === "OPEN_FINANCE"
+              ? "bg-primary/12 text-primary"
+              : "bg-info/12 text-info",
+          )}
+        >
+          {investment.source === "OPEN_FINANCE" ? (
+            <>
+              <Wifi className="size-3" aria-hidden="true" /> Open Finance
+            </>
+          ) : (
+            "Cadastro manual"
+          )}
+        </span>
+
+        <Button variant="secondary" className="w-full rounded-xl">
+          Ver investimento
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
 
 function InvestimentosPage() {
-  const [filtro, setFiltro] = useState<(typeof filtros)[number]>("Todos");
-  const visiveis = useMemo(
-    () => (filtro === "Todos" ? ativos : ativos.filter((a) => a.classe === filtro)),
-    [filtro],
-  );
+  const investmentsQuery = useInvestments();
+  const summaryQuery = useInvestmentsSummary();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [archiving, setArchiving] = useState<Investment | null>(null);
 
-  const total = classes.reduce((s, c) => s + c.valor, 0);
+  const investments = investmentsQuery.data ?? [];
+  const summary = summaryQuery.data;
+
+  const allocation = (summary?.byType ?? []).map((item, index) => ({
+    ...item,
+    label: INVESTMENT_TYPE_LABELS[item.type],
+    color: ALLOCATION_CHART_COLORS[index % ALLOCATION_CHART_COLORS.length],
+  }));
 
   return (
     <AppShell>
@@ -88,107 +185,105 @@ function InvestimentosPage() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Investimentos</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Sua carteira consolidada e a evolução do patrimônio.
+            Sua carteira, aportes, resgates e rendimentos em um só lugar.
           </p>
         </div>
-        <Button className="rounded-xl bg-gradient-brand font-semibold">
+        <Button
+          onClick={() => setDialogOpen(true)}
+          className="rounded-xl bg-gradient-brand font-semibold"
+        >
           <Plus className="size-4" aria-hidden="true" />
-          Novo aporte
+          Novo investimento
         </Button>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card className="rounded-3xl border-border/70 bg-gradient-surface shadow-soft">
           <CardContent className="p-5">
             <p className="text-sm text-muted-foreground">Patrimônio investido</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight">{brl(total)}</p>
-            <span className="mt-3 inline-flex items-center gap-1 rounded-full bg-primary/12 px-2 py-1 text-xs font-medium text-primary">
-              <ArrowUpRight className="size-3" aria-hidden="true" /> +5,1% no mês
-            </span>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="mt-2 h-8 w-32" />
+            ) : (
+              <p className="mt-1 text-2xl font-semibold tracking-tight">
+                {formatBRL(summary?.totalCurrentValue ?? 0)}
+              </p>
+            )}
+            <p className="mt-3 text-xs text-muted-foreground">
+              {summary?.investmentCount ?? 0} investimentos ativos
+            </p>
           </CardContent>
         </Card>
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Rentabilidade 12m</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight text-primary">+13,4%</p>
-            <p className="mt-3 text-xs text-muted-foreground">CDI no período: +10,8%</p>
+            <p className="text-sm text-muted-foreground">Valor aplicado</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="mt-2 h-8 w-32" />
+            ) : (
+              <p className="mt-1 text-2xl font-semibold tracking-tight">
+                {formatBRL(summary?.totalInvested ?? 0)}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Aporte médio mensal</p>
-            <p className="mt-1 text-2xl font-semibold tracking-tight">{brl(2600)}</p>
-            <p className="mt-3 text-xs text-muted-foreground">22% da sua renda líquida</p>
+            <p className="text-sm text-muted-foreground">Rentabilidade</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="mt-2 h-8 w-32" />
+            ) : (
+              <p
+                className={cn(
+                  "mt-1 text-2xl font-semibold tracking-tight",
+                  (summary?.totalReturn ?? 0) >= 0 ? "text-primary" : "text-destructive",
+                )}
+              >
+                {(summary?.totalReturn ?? 0) >= 0 ? "+" : ""}
+                {formatBRL(summary?.totalReturn ?? 0)}
+              </p>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">
+              {(summary?.totalReturnPct ?? 0) >= 0 ? "+" : ""}
+              {(summary?.totalReturnPct ?? 0).toFixed(2)}%
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardContent className="p-5">
+            <p className="text-sm text-muted-foreground">Rendimentos</p>
+            {summaryQuery.isLoading ? (
+              <Skeleton className="mt-2 h-8 w-32" />
+            ) : (
+              <p className="mt-1 text-2xl font-semibold tracking-tight">
+                {formatBRL(summary?.totalIncome ?? 0)}
+              </p>
+            )}
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-3">
-        <Card className="rounded-3xl border-border/70 shadow-soft xl:col-span-2">
-          <CardHeader className="flex-row items-center justify-between">
-            <CardTitle className="text-base font-semibold">Evolução do patrimônio</CardTitle>
-            <span className="text-xs text-muted-foreground">Últimos 6 meses</span>
-          </CardHeader>
-          <CardContent className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={patrimonio}>
-                <defs>
-                  <linearGradient id="inv" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="var(--chart-2)" stopOpacity={0.5} />
-                    <stop offset="100%" stopColor="var(--chart-2)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid vertical={false} stroke="var(--border)" />
-                <XAxis dataKey="mes" tickLine={false} axisLine={false} fontSize={12} />
-                <YAxis
-                  tickLine={false}
-                  axisLine={false}
-                  fontSize={12}
-                  tickFormatter={(v: number) => `${v / 1000}k`}
-                />
-                <Tooltip
-                  formatter={(v: number) => brl(v)}
-                  contentStyle={{
-                    borderRadius: 12,
-                    border: "1px solid var(--border)",
-                    background: "var(--popover)",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="valor"
-                  stroke="var(--chart-2)"
-                  strokeWidth={2.5}
-                  fill="url(#inv)"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
+      {allocation.length > 0 && (
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardHeader>
-            <CardTitle className="text-base font-semibold">Alocação por classe</CardTitle>
+            <CardTitle className="text-base font-semibold">Carteira por tipo</CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="h-48">
+          <CardContent className="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-center">
+            <div className="h-56">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={classes}
-                    dataKey="valor"
-                    nameKey="nome"
-                    innerRadius={52}
-                    outerRadius={78}
+                    data={allocation}
+                    dataKey="currentValue"
+                    nameKey="label"
+                    innerRadius={55}
+                    outerRadius={85}
                     paddingAngle={3}
-                    stroke="none"
                   >
-                    {classes.map((c) => (
-                      <Cell key={c.nome} fill={c.cor} />
+                    {allocation.map((item) => (
+                      <Cell key={item.type} fill={item.color} stroke="transparent" />
                     ))}
                   </Pie>
                   <Tooltip
-                    formatter={(v: number) => brl(v)}
+                    formatter={(value: number) => formatBRL(value)}
                     contentStyle={{
                       borderRadius: 12,
                       border: "1px solid var(--border)",
@@ -198,95 +293,67 @@ function InvestimentosPage() {
                 </PieChart>
               </ResponsiveContainer>
             </div>
-            <div className="mt-4 space-y-3">
-              {classes.map((c) => {
-                const pct = Math.round((c.valor / total) * 100);
-                return (
-                  <div key={c.nome} className="space-y-1.5">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="flex items-center gap-2 font-medium">
-                        <span
-                          className="size-2.5 rounded-full"
-                          style={{ backgroundColor: c.cor }}
-                          aria-hidden="true"
-                        />
-                        {c.nome}
-                      </span>
-                      <span className="text-muted-foreground">{pct}%</span>
-                    </div>
-                    <Progress value={pct} className="h-1.5" />
-                  </div>
-                );
-              })}
+            <div className="space-y-2">
+              {allocation.map((item) => (
+                <div key={item.type} className="flex items-center gap-2 text-sm">
+                  <span
+                    className="size-2.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: item.color }}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0 flex-1 truncate">{item.label}</span>
+                  <span className="font-medium">{formatBRL(item.currentValue)}</span>
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>
-      </section>
+      )}
 
-      <Card className="rounded-3xl border-border/70 shadow-soft">
-        <CardHeader className="flex-row flex-wrap items-center justify-between gap-3">
-          <CardTitle className="text-base font-semibold">Meus ativos</CardTitle>
-          <div className="flex flex-wrap items-center gap-2">
-            {filtros.map((f) => (
-              <button
-                key={f}
-                type="button"
-                onClick={() => setFiltro(f)}
-                aria-pressed={filtro === f}
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
-                  filtro === f
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-surface-2 text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {f}
-              </button>
+      <section>
+        {investmentsQuery.isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-56 w-full rounded-3xl" />
             ))}
           </div>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {visiveis.map((a) => (
-            <div
-              key={a.nome}
-              className="flex items-center justify-between gap-3 rounded-2xl bg-surface-2 px-4 py-3"
-            >
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{a.nome}</p>
-                <p className="text-xs text-muted-foreground">{a.classe}</p>
-              </div>
-              <div className="shrink-0 text-right">
-                <p className="text-sm font-semibold">{brl(a.valor)}</p>
-                <p
-                  className={cn(
-                    "text-xs font-medium",
-                    a.rent >= 0 ? "text-primary" : "text-destructive",
-                  )}
-                >
-                  {a.rent >= 0 ? "+" : ""}
-                  {a.rent.toLocaleString("pt-BR", { minimumFractionDigits: 1 })}% no mês
-                </p>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+        ) : investmentsQuery.isError ? (
+          <Card className="rounded-3xl border-border/70 shadow-soft">
+            <CardContent className="flex flex-col items-center gap-3 py-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                Não foi possível carregar seus investimentos.
+              </p>
+              <Button variant="outline" onClick={() => investmentsQuery.refetch()}>
+                Tentar novamente
+              </Button>
+            </CardContent>
+          </Card>
+        ) : investments.length === 0 ? (
+          <Card className="rounded-3xl border-border/70 shadow-soft">
+            <CardContent>
+              <EmptyInvestmentsState onNewInvestment={() => setDialogOpen(true)} />
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {investments.map((investment) => (
+              <InvestmentTile
+                key={investment.id}
+                investment={investment}
+                onArchive={() => setArchiving(investment)}
+              />
+            ))}
+          </div>
+        )}
+      </section>
 
-      <Card className="rounded-3xl border-border/70 bg-gradient-surface shadow-soft">
-        <CardContent className="flex flex-wrap items-center gap-4 p-5">
-          <span className="grid size-10 place-items-center rounded-2xl bg-gradient-brand text-primary-foreground">
-            <Sparkles className="size-5" aria-hidden="true" />
-          </span>
-          <p className="min-w-60 flex-1 text-sm text-muted-foreground">
-            <strong className="text-foreground">Certo IA:</strong> sua carteira está 43% em renda
-            fixa. Com o seu perfil moderado, um aporte extra de {brl(1500)} em FIIs melhoraria a
-            renda passiva mensal em cerca de {brl(12)}.
-          </p>
-          <Button variant="secondary" className="rounded-xl">
-            Ver sugestão completa
-          </Button>
-        </CardContent>
-      </Card>
+      <InvestmentFormDialog open={dialogOpen} onOpenChange={setDialogOpen} investment={null} />
+      <ArchiveInvestmentDialog
+        investment={archiving}
+        onOpenChange={(open) => {
+          if (!open) setArchiving(null);
+        }}
+      />
     </AppShell>
   );
 }

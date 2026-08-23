@@ -26,12 +26,15 @@ import { OpenFinanceAccountsService } from "./services/open-finance-accounts.ser
 import { OpenFinanceConnectionsService } from "./services/open-finance-connections.service";
 import { OpenFinanceSyncService } from "./services/open-finance-sync.service";
 import { OpenFinanceTransactionsService } from "./services/open-finance-transactions.service";
+import { OpenFinanceCreditCardsService } from "./services/open-finance-credit-cards.service";
 import { CreateConnectTokenDto } from "./dto/create-connect-token.dto";
 import { CreateConnectionDto } from "./dto/create-connection.dto";
 import { SelectAccountsDto } from "./dto/select-accounts.dto";
 import { DisconnectAccountQueryDto } from "./dto/disconnect-account-query.dto";
 import { ListTransactionsQueryDto } from "./dto/list-transactions-query.dto";
 import { UpdateTransactionDto } from "./dto/update-transaction.dto";
+import { ListOpenFinanceCreditCardsQueryDto } from "./dto/list-credit-cards-query.dto";
+import { AddOpenFinanceCreditCardDto } from "./dto/add-credit-card.dto";
 
 interface PluggyWebhookPayload {
   event: string;
@@ -48,6 +51,7 @@ export class OpenFinanceController {
     private readonly accountsService: OpenFinanceAccountsService,
     private readonly transactionsService: OpenFinanceTransactionsService,
     private readonly syncService: OpenFinanceSyncService,
+    private readonly creditCardsService: OpenFinanceCreditCardsService,
     private readonly auditLogService: AuditLogService,
     private readonly config: AppConfigService,
   ) {}
@@ -200,6 +204,41 @@ export class OpenFinanceController {
   ) {
     const data = await this.transactionsService.update(user.sub, id, dto);
     return { message: "Movimentação atualizada.", data };
+  }
+
+  @ApiBearerAuth()
+  @Get("credit-cards")
+  @ApiOperation({
+    summary: "Lista cartões de crédito disponíveis numa conexão, ainda não importados",
+  })
+  async listAvailableCreditCards(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: ListOpenFinanceCreditCardsQueryDto,
+  ) {
+    const data = await this.creditCardsService.listAvailable(user.sub, query.connectionId);
+    return { message: "Cartões disponíveis via Open Finance.", data };
+  }
+
+  @ApiBearerAuth()
+  @Post("credit-cards")
+  @ApiOperation({ summary: "Importa um cartão de crédito disponível numa conexão" })
+  async addCreditCard(@CurrentUser() user: JwtPayload, @Body() dto: AddOpenFinanceCreditCardDto) {
+    const data = await this.creditCardsService.addCard(
+      user.sub,
+      dto.connectionId,
+      dto.externalCardId,
+    );
+    return { message: "Cartão adicionado ao Método Certo.", data };
+  }
+
+  @ApiBearerAuth()
+  @Post("credit-cards/:id/sync")
+  @ApiOperation({ summary: "Sincroniza manualmente um cartão de crédito conectado" })
+  async syncCreditCard(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    const result = await this.creditCardsService.syncCard(user.sub, id);
+    return {
+      message: `Sincronização concluída. ${result.importedCount} lançamentos processados.`,
+    };
   }
 
   @Public()

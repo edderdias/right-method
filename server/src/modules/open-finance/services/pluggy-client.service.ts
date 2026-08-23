@@ -5,6 +5,7 @@ import type {
   PluggyAccount,
   PluggyAccountsResponse,
   PluggyAuthResponse,
+  PluggyBill,
   PluggyConnectTokenResponse,
   PluggyItem,
   PluggyTransaction,
@@ -85,6 +86,10 @@ export class PluggyClientService {
 
   async deleteItem(itemId: string): Promise<void> {
     await this.request<{ count: number }>("DELETE", `/items/${itemId}`);
+  }
+
+  getBill(billId: string): Promise<PluggyBill> {
+    return this.request<PluggyBill>("GET", `/bills/${billId}`);
   }
 
   private async getApiKey(forceRefresh = false): Promise<string> {

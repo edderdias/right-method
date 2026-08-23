@@ -65,7 +65,7 @@ export const Route = createFileRoute("/receitas")({
         content:
           "Acompanhe salários, freelas, aluguéis e rendimentos: total do período, evolução e lançamentos.",
       },
-      { property: "og:title", content: "Controle de receitas | Método Certo" },
+      { property: "og:title", content: "Controle Financeiro | Método Certo" },
       {
         property: "og:description",
         content: "Veja de onde vem o seu dinheiro e organize suas entradas mês a mês.",

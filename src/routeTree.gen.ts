@@ -22,7 +22,10 @@ import { Route as MetasRouteImport } from './routes/metas'
 import { Route as ReceitasRouteImport } from './routes/receitas'
 import { Route as RelatoriosRouteImport } from './routes/relatorios'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
-import { Route as ContasAccountIdRouteImport } from './routes/contas.$accountId'
+import { Route as CartoesCardIdRouteImport } from './routes/cartoes_.$cardId'
+import { Route as ContasAccountIdRouteImport } from './routes/contas_.$accountId'
+import { Route as InvestimentosInvestmentIdRouteImport } from './routes/investimentos_.$investmentId'
+import { Route as MetasGoalIdRouteImport } from './routes/metas_.$goalId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -89,10 +92,26 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
   path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CartoesCardIdRoute = CartoesCardIdRouteImport.update({
+  id: '/cartoes_/$cardId',
+  path: '/cartoes/$cardId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContasAccountIdRoute = ContasAccountIdRouteImport.update({
-  id: '/$accountId',
-  path: '/$accountId',
-  getParentRoute: () => ContasRoute,
+  id: '/contas_/$accountId',
+  path: '/contas/$accountId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InvestimentosInvestmentIdRoute =
+  InvestimentosInvestmentIdRouteImport.update({
+    id: '/investimentos_/$investmentId',
+    path: '/investimentos/$investmentId',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const MetasGoalIdRoute = MetasGoalIdRouteImport.update({
+  id: '/metas_/$goalId',
+  path: '/metas/$goalId',
+  getParentRoute: () => rootRouteImport,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -101,7 +120,7 @@ export interface FileRoutesByFullPath {
   '/cartoes': typeof CartoesRoute
   '/certo-ia': typeof CertoIaRoute
   '/configuracoes': typeof ConfiguracoesRoute
-  '/contas': typeof ContasRouteWithChildren
+  '/contas': typeof ContasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
@@ -109,7 +128,10 @@ export interface FileRoutesByFullPath {
   '/receitas': typeof ReceitasRoute
   '/relatorios': typeof RelatoriosRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/cartoes/$cardId': typeof CartoesCardIdRoute
   '/contas/$accountId': typeof ContasAccountIdRoute
+  '/investimentos/$investmentId': typeof InvestimentosInvestmentIdRoute
+  '/metas/$goalId': typeof MetasGoalIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -117,7 +139,7 @@ export interface FileRoutesByTo {
   '/cartoes': typeof CartoesRoute
   '/certo-ia': typeof CertoIaRoute
   '/configuracoes': typeof ConfiguracoesRoute
-  '/contas': typeof ContasRouteWithChildren
+  '/contas': typeof ContasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
@@ -125,7 +147,10 @@ export interface FileRoutesByTo {
   '/receitas': typeof ReceitasRoute
   '/relatorios': typeof RelatoriosRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/cartoes/$cardId': typeof CartoesCardIdRoute
   '/contas/$accountId': typeof ContasAccountIdRoute
+  '/investimentos/$investmentId': typeof InvestimentosInvestmentIdRoute
+  '/metas/$goalId': typeof MetasGoalIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -134,7 +159,7 @@ export interface FileRoutesById {
   '/cartoes': typeof CartoesRoute
   '/certo-ia': typeof CertoIaRoute
   '/configuracoes': typeof ConfiguracoesRoute
-  '/contas': typeof ContasRouteWithChildren
+  '/contas': typeof ContasRoute
   '/dashboard': typeof DashboardRoute
   '/despesas': typeof DespesasRoute
   '/investimentos': typeof InvestimentosRoute
@@ -142,7 +167,10 @@ export interface FileRoutesById {
   '/receitas': typeof ReceitasRoute
   '/relatorios': typeof RelatoriosRoute
   '/verify-email': typeof VerifyEmailRoute
-  '/contas/$accountId': typeof ContasAccountIdRoute
+  '/cartoes_/$cardId': typeof CartoesCardIdRoute
+  '/contas_/$accountId': typeof ContasAccountIdRoute
+  '/investimentos_/$investmentId': typeof InvestimentosInvestmentIdRoute
+  '/metas_/$goalId': typeof MetasGoalIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -160,7 +188,10 @@ export interface FileRouteTypes {
     | '/receitas'
     | '/relatorios'
     | '/verify-email'
+    | '/cartoes/$cardId'
     | '/contas/$accountId'
+    | '/investimentos/$investmentId'
+    | '/metas/$goalId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -176,7 +207,10 @@ export interface FileRouteTypes {
     | '/receitas'
     | '/relatorios'
     | '/verify-email'
+    | '/cartoes/$cardId'
     | '/contas/$accountId'
+    | '/investimentos/$investmentId'
+    | '/metas/$goalId'
   id:
     | '__root__'
     | '/'
@@ -192,7 +226,10 @@ export interface FileRouteTypes {
     | '/receitas'
     | '/relatorios'
     | '/verify-email'
-    | '/contas/$accountId'
+    | '/cartoes_/$cardId'
+    | '/contas_/$accountId'
+    | '/investimentos_/$investmentId'
+    | '/metas_/$goalId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -201,7 +238,7 @@ export interface RootRouteChildren {
   CartoesRoute: typeof CartoesRoute
   CertoIaRoute: typeof CertoIaRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
-  ContasRoute: typeof ContasRouteWithChildren
+  ContasRoute: typeof ContasRoute
   DashboardRoute: typeof DashboardRoute
   DespesasRoute: typeof DespesasRoute
   InvestimentosRoute: typeof InvestimentosRoute
@@ -209,6 +246,10 @@ export interface RootRouteChildren {
   ReceitasRoute: typeof ReceitasRoute
   RelatoriosRoute: typeof RelatoriosRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  CartoesCardIdRoute: typeof CartoesCardIdRoute
+  ContasAccountIdRoute: typeof ContasAccountIdRoute
+  InvestimentosInvestmentIdRoute: typeof InvestimentosInvestmentIdRoute
+  MetasGoalIdRoute: typeof MetasGoalIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -304,26 +345,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/contas/$accountId': {
-      id: '/contas/$accountId'
-      path: '/$accountId'
+    '/cartoes_/$cardId': {
+      id: '/cartoes_/$cardId'
+      path: '/cartoes/$cardId'
+      fullPath: '/cartoes/$cardId'
+      preLoaderRoute: typeof CartoesCardIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contas_/$accountId': {
+      id: '/contas_/$accountId'
+      path: '/contas/$accountId'
       fullPath: '/contas/$accountId'
       preLoaderRoute: typeof ContasAccountIdRouteImport
-      parentRoute: typeof ContasRoute
+      parentRoute: typeof rootRouteImport
+    }
+    '/investimentos_/$investmentId': {
+      id: '/investimentos_/$investmentId'
+      path: '/investimentos/$investmentId'
+      fullPath: '/investimentos/$investmentId'
+      preLoaderRoute: typeof InvestimentosInvestmentIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/metas_/$goalId': {
+      id: '/metas_/$goalId'
+      path: '/metas/$goalId'
+      fullPath: '/metas/$goalId'
+      preLoaderRoute: typeof MetasGoalIdRouteImport
+      parentRoute: typeof rootRouteImport
     }
   }
 }
-
-interface ContasRouteChildren {
-  ContasAccountIdRoute: typeof ContasAccountIdRoute
-}
-
-const ContasRouteChildren: ContasRouteChildren = {
-  ContasAccountIdRoute: ContasAccountIdRoute,
-}
-
-const ContasRouteWithChildren =
-  ContasRoute._addFileChildren(ContasRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -331,7 +382,7 @@ const rootRouteChildren: RootRouteChildren = {
   CartoesRoute: CartoesRoute,
   CertoIaRoute: CertoIaRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
-  ContasRoute: ContasRouteWithChildren,
+  ContasRoute: ContasRoute,
   DashboardRoute: DashboardRoute,
   DespesasRoute: DespesasRoute,
   InvestimentosRoute: InvestimentosRoute,
@@ -339,6 +390,10 @@ const rootRouteChildren: RootRouteChildren = {
   ReceitasRoute: ReceitasRoute,
   RelatoriosRoute: RelatoriosRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  CartoesCardIdRoute: CartoesCardIdRoute,
+  ContasAccountIdRoute: ContasAccountIdRoute,
+  InvestimentosInvestmentIdRoute: InvestimentosInvestmentIdRoute,
+  MetasGoalIdRoute: MetasGoalIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
