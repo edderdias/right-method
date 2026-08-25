@@ -1,6 +1,6 @@
 import { Injectable } from "@nestjs/common";
 import type { User } from "@prisma/client";
-import { UserStatus } from "@prisma/client";
+import { AiProvider, UserStatus } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { AppConfigService } from "../../config/app-config.service";
 import { decryptSecret, encryptSecret } from "../../common/utils/secret-crypto";
@@ -27,7 +27,8 @@ export type PublicUser = Pick<
   | "biometricEnabled"
   | "twoFactorEnabled"
   | "newDeviceAlertEnabled"
-> & { hasOpenAiApiKey: boolean };
+  | "aiProvider"
+> & { hasAiApiKey: boolean; hasPluggyCredentials: boolean };
 
 @Injectable()
 export class UsersService {
@@ -123,31 +124,70 @@ export class UsersService {
       biometricEnabled: user.biometricEnabled,
       twoFactorEnabled: user.twoFactorEnabled,
       newDeviceAlertEnabled: user.newDeviceAlertEnabled,
-      hasOpenAiApiKey: Boolean(user.openAiApiKeyEncrypted),
+      aiProvider: user.aiProvider,
+      hasAiApiKey: Boolean(user.aiApiKeyEncrypted),
+      hasPluggyCredentials: Boolean(user.pluggyClientId && user.pluggyClientSecretEncrypted),
     };
   }
 
-  async setOpenAiApiKey(userId: string, apiKey: string): Promise<void> {
+  async setAiCredentials(userId: string, provider: AiProvider, apiKey: string): Promise<void> {
     const encrypted = encryptSecret(apiKey, this.config.get("JWT_ACCESS_SECRET"));
     await this.prisma.user.update({
       where: { id: userId },
-      data: { openAiApiKeyEncrypted: encrypted },
+      data: { aiProvider: provider, aiApiKeyEncrypted: encrypted },
     });
   }
 
-  async clearOpenAiApiKey(userId: string): Promise<void> {
+  async clearAiCredentials(userId: string): Promise<void> {
     await this.prisma.user.update({
       where: { id: userId },
-      data: { openAiApiKeyEncrypted: null },
+      data: { aiApiKeyEncrypted: null },
     });
   }
 
-  async getOpenAiApiKey(userId: string): Promise<string | null> {
+  async getAiCredentials(
+    userId: string,
+  ): Promise<{ provider: AiProvider; apiKey: string } | null> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { openAiApiKeyEncrypted: true },
+      select: { aiProvider: true, aiApiKeyEncrypted: true },
     });
-    if (!user?.openAiApiKeyEncrypted) return null;
-    return decryptSecret(user.openAiApiKeyEncrypted, this.config.get("JWT_ACCESS_SECRET"));
+    if (!user?.aiApiKeyEncrypted) return null;
+    return {
+      provider: user.aiProvider,
+      apiKey: decryptSecret(user.aiApiKeyEncrypted, this.config.get("JWT_ACCESS_SECRET")),
+    };
+  }
+
+  async setPluggyCredentials(userId: string, clientId: string, clientSecret: string): Promise<void> {
+    const encrypted = encryptSecret(clientSecret, this.config.get("JWT_ACCESS_SECRET"));
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pluggyClientId: clientId, pluggyClientSecretEncrypted: encrypted },
+    });
+  }
+
+  async clearPluggyCredentials(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { pluggyClientId: null, pluggyClientSecretEncrypted: null },
+    });
+  }
+
+  async getPluggyCredentials(
+    userId: string,
+  ): Promise<{ clientId: string; clientSecret: string } | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { pluggyClientId: true, pluggyClientSecretEncrypted: true },
+    });
+    if (!user?.pluggyClientId || !user.pluggyClientSecretEncrypted) return null;
+    return {
+      clientId: user.pluggyClientId,
+      clientSecret: decryptSecret(
+        user.pluggyClientSecretEncrypted,
+        this.config.get("JWT_ACCESS_SECRET"),
+      ),
+    };
   }
 }

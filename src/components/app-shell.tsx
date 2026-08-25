@@ -29,6 +29,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import { useFamilyView } from "@/hooks/use-family-view";
 import { useCurrentUser } from "@/hooks/use-user-settings";
 import { clearSession } from "@/lib/auth";
@@ -63,6 +70,7 @@ function initialsOf(name: string): string {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const navigate = useNavigate();
   const { data: currentUser } = useCurrentUser();
   const { viewAsUserId, viewingOwner, accessibleAccounts, switchTo } = useFamilyView();
@@ -114,7 +122,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             <Button
               variant="ghost"
               size="icon"
-              className="rounded-xl"
+              className="rounded-xl lg:hidden"
+              aria-label="Abrir menu"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu className="size-5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hidden rounded-xl lg:inline-flex"
               aria-label="Recolher menu"
               onClick={() => setSidebarOpen((v) => !v)}
             >
@@ -205,6 +222,38 @@ export function AppShell({ children }: { children: ReactNode }) {
           <main className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6">{children}</main>
         </div>
       </div>
+
+      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+        <SheetContent side="left" className="flex w-72 flex-col p-4">
+          <SheetHeader className="space-y-0">
+            <SheetTitle className="sr-only">Menu de navegação</SheetTitle>
+            <BrandLockup />
+          </SheetHeader>
+          <nav className="mt-4 flex-1 space-y-1" aria-label="Navegação principal">
+            {nav.map((item) => (
+              <SheetClose asChild key={item.label}>
+                <Link
+                  to={item.to}
+                  className={cn(itemBase, inactive)}
+                  activeProps={{ className: cn(itemBase, active) }}
+                >
+                  <item.icon className="size-5 shrink-0" aria-hidden="true" />
+                  <span className="truncate">{item.label}</span>
+                </Link>
+              </SheetClose>
+            ))}
+          </nav>
+          <SheetClose asChild>
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="mt-4 rounded-xl px-3 py-2.5 text-left text-sm text-muted-foreground hover:text-foreground"
+            >
+              Sair da conta
+            </button>
+          </SheetClose>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

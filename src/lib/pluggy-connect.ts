@@ -17,8 +17,16 @@ export function openPluggyConnect(options: OpenPluggyConnectOptions): void {
     includeSandbox: import.meta.env.DEV,
     ...(options.updateItemId ? { updateItem: options.updateItemId } : {}),
     onSuccess: (data) => options.onSuccess(data.item.id),
-    ...(options.onError ? { onError: (error) => options.onError?.(error.message) } : {}),
-    ...(options.onClose ? { onClose: options.onClose } : {}),
+    // Pluggy's own close control isn't always reliable once the item errors out (e.g. connection
+    // refused) — destroy the widget ourselves so it never gets stuck open on screen.
+    onError: (error) => {
+      options.onError?.(error.message);
+      void widget.destroy();
+    },
+    onClose: () => {
+      options.onClose?.();
+      void widget.destroy();
+    },
   });
   void widget.init();
 }

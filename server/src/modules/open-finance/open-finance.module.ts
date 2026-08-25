@@ -1,5 +1,6 @@
 import { Module } from "@nestjs/common";
 import { AuditModule } from "../audit/audit.module";
+import { UsersModule } from "../users/users.module";
 import { OpenFinanceController } from "./open-finance.controller";
 import { PluggyClientService } from "./services/pluggy-client.service";
 import { TransactionCategorizerService } from "./services/transaction-categorizer.service";
@@ -10,7 +11,7 @@ import { OpenFinanceTransactionsService } from "./services/open-finance-transact
 import { OpenFinanceCreditCardsService } from "./services/open-finance-credit-cards.service";
 
 @Module({
-  imports: [AuditModule],
+  imports: [AuditModule, UsersModule],
   controllers: [OpenFinanceController],
   providers: [
     PluggyClientService,

@@ -104,7 +104,7 @@ describe("OpenFinanceSyncService", () => {
     await service.syncAccount("acc-1");
 
     expect(config.get).toHaveBeenCalledWith("OPEN_FINANCE_INITIAL_SYNC_DAYS");
-    const { from } = pluggyClient.listTransactions.mock.calls[0][1];
+    const { from } = pluggyClient.listTransactions.mock.calls[0][2];
     expect(from).not.toBeNull();
   });
 
@@ -114,7 +114,7 @@ describe("OpenFinanceSyncService", () => {
 
     await service.syncAccount("acc-1");
 
-    const { from } = pluggyClient.listTransactions.mock.calls[0][1];
+    const { from } = pluggyClient.listTransactions.mock.calls[0][2];
     expect(from).toBe("2026-08-09");
   });
 

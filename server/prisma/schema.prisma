@@ -25,6 +25,12 @@ enum VerificationTokenType {
   PASSWORD_RESET
 }
 
+enum AiProvider {
+  OPENAI
+  ANTHROPIC
+  GOOGLE
+}
+
 enum AuditEvent {
   LOGIN_SUCCESS
   LOGIN_FAILED
@@ -202,7 +208,11 @@ model User {
   twoFactorEnabled      Boolean @default(false)
   newDeviceAlertEnabled Boolean @default(true)
 
-  openAiApiKeyEncrypted String?
+  aiProvider        AiProvider @default(OPENAI)
+  aiApiKeyEncrypted String?
+
+  pluggyClientId              String?
+  pluggyClientSecretEncrypted String?
 
   sessions               UserSession[]
   verificationTokens     VerificationToken[]

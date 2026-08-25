@@ -10,6 +10,7 @@ import {
   Fingerprint,
   Globe,
   KeyRound,
+  Landmark,
   LogOut,
   Moon,
   Palette,
@@ -35,6 +36,13 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   useActiveFamilyInvite,
@@ -45,10 +53,18 @@ import {
   useRevokeFamilyGrant,
   useRevokeFamilyInvite,
 } from "@/hooks/use-family";
-import { useOpenAiKeyStatus, useRemoveOpenAiKey, useSaveOpenAiKey } from "@/hooks/use-ai-chat";
+import {
+  useAiCredentialsStatus,
+  useRemoveAiCredentials,
+  useSaveAiCredentials,
+} from "@/hooks/use-ai-chat";
+import { useTheme } from "@/hooks/use-theme";
 import {
   useChangePassword,
   useCurrentUser,
+  usePluggyCredentialsStatus,
+  useRemovePluggyCredentials,
+  useSavePluggyCredentials,
   useUpdateNotificationPreferences,
   useUpdateProfile,
   useUpdateSecurityPreferences,
@@ -57,7 +73,7 @@ import { ApiError } from "@/lib/api-client";
 import { logoutAllSessions } from "@/lib/auth";
 import { formatDateTime } from "@/lib/finance-format";
 import { cn } from "@/lib/utils";
-import type { NotificationPreferences, SecurityPreferences } from "@/types/user";
+import type { AiProvider, NotificationPreferences, SecurityPreferences } from "@/types/user";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/configuracoes")({
@@ -120,6 +136,12 @@ const seguranca: {
   },
 ];
 
+const aiProviderOptions: { value: AiProvider; label: string; placeholder: string }[] = [
+  { value: "OPENAI", label: "ChatGPT (OpenAI)", placeholder: "sk-..." },
+  { value: "ANTHROPIC", label: "Claude (Anthropic)", placeholder: "sk-ant-..." },
+  { value: "GOOGLE", label: "Gemini (Google)", placeholder: "AIza..." },
+];
+
 const temas = [
   { id: "claro", label: "Claro", icon: Sun },
   { id: "escuro", label: "Escuro", icon: Moon },
@@ -128,7 +150,7 @@ const temas = [
 
 function ConfiguracoesPage() {
   const navigate = useNavigate();
-  const [tema, setTema] = useState<(typeof temas)[number]["id"]>("claro");
+  const { theme: tema, setTheme: setTema } = useTheme();
   const [ocultarSaldos, setOcultarSaldos] = useState(false);
 
   const { data: currentUser } = useCurrentUser();
@@ -197,14 +219,40 @@ function ConfiguracoesPage() {
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
-  const { data: aiKeyStatus } = useOpenAiKeyStatus();
-  const saveOpenAiKeyMutation = useSaveOpenAiKey();
-  const removeOpenAiKeyMutation = useRemoveOpenAiKey();
+  const [aiProviderInput, setAiProviderInput] = useState<AiProvider>("OPENAI");
+  const { data: aiCredentialsStatus } = useAiCredentialsStatus();
+  const saveAiCredentialsMutation = useSaveAiCredentials();
+  const removeAiCredentialsMutation = useRemoveAiCredentials();
 
   const handleSaveApiKey = () => {
     const trimmed = apiKeyInput.trim();
     if (!trimmed) return;
-    saveOpenAiKeyMutation.mutate(trimmed, { onSuccess: () => setApiKeyInput("") });
+    saveAiCredentialsMutation.mutate(
+      { provider: aiProviderInput, apiKey: trimmed },
+      { onSuccess: () => setApiKeyInput("") },
+    );
+  };
+
+  const [pluggyClientIdInput, setPluggyClientIdInput] = useState("");
+  const [pluggyClientSecretInput, setPluggyClientSecretInput] = useState("");
+  const [showPluggySecret, setShowPluggySecret] = useState(false);
+  const { data: pluggyCredentialsStatus } = usePluggyCredentialsStatus();
+  const savePluggyCredentialsMutation = useSavePluggyCredentials();
+  const removePluggyCredentialsMutation = useRemovePluggyCredentials();
+
+  const handleSavePluggyCredentials = () => {
+    const clientId = pluggyClientIdInput.trim();
+    const clientSecret = pluggyClientSecretInput.trim();
+    if (!clientId || !clientSecret) return;
+    savePluggyCredentialsMutation.mutate(
+      { clientId, clientSecret },
+      {
+        onSuccess: () => {
+          setPluggyClientIdInput("");
+          setPluggyClientSecretInput("");
+        },
+      },
+    );
   };
 
   const { data: activeInvite } = useActiveFamilyInvite();
@@ -392,16 +440,22 @@ function ConfiguracoesPage() {
             </CardHeader>
             <CardContent className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                Cadastre sua chave da API da OpenAI para usar o Certo IA com a sua própria conta.
+                Escolha o provedor de IA e cadastre sua própria chave para usar o Certo IA com a
+                sua conta.
               </p>
-              {aiKeyStatus?.hasKey ? (
+              {aiCredentialsStatus?.hasKey ? (
                 <div className="flex items-center justify-between rounded-2xl bg-surface-2 p-3">
                   <div className="flex items-center gap-3">
                     <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
                       <KeyRound className="size-4" aria-hidden="true" />
                     </span>
                     <div>
-                      <p className="text-sm font-medium">Chave configurada</p>
+                      <p className="text-sm font-medium">
+                        {
+                          aiProviderOptions.find((o) => o.value === aiCredentialsStatus.provider)
+                            ?.label
+                        }
+                      </p>
                       <p className="text-xs text-muted-foreground">••••••••••••••••</p>
                     </div>
                   </div>
@@ -409,18 +463,35 @@ function ConfiguracoesPage() {
                     variant="ghost"
                     size="sm"
                     className="text-destructive"
-                    onClick={() => removeOpenAiKeyMutation.mutate()}
-                    disabled={removeOpenAiKeyMutation.isPending}
+                    onClick={() => removeAiCredentialsMutation.mutate()}
+                    disabled={removeAiCredentialsMutation.isPending}
                   >
                     Remover
                   </Button>
                 </div>
               ) : (
                 <div className="space-y-2">
+                  <Select
+                    value={aiProviderInput}
+                    onValueChange={(value) => setAiProviderInput(value as AiProvider)}
+                  >
+                    <SelectTrigger className="h-11 rounded-xl">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {aiProviderOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <div className="relative">
                     <Input
                       type={showApiKey ? "text" : "password"}
-                      placeholder="sk-..."
+                      placeholder={
+                        aiProviderOptions.find((o) => o.value === aiProviderInput)?.placeholder
+                      }
                       value={apiKeyInput}
                       onChange={(e) => setApiKeyInput(e.target.value)}
                       className="h-11 rounded-xl pr-10"
@@ -441,9 +512,96 @@ function ConfiguracoesPage() {
                   <Button
                     className="w-full rounded-xl bg-gradient-brand font-semibold"
                     onClick={handleSaveApiKey}
-                    disabled={!apiKeyInput.trim() || saveOpenAiKeyMutation.isPending}
+                    disabled={!apiKeyInput.trim() || saveAiCredentialsMutation.isPending}
                   >
                     Salvar chave
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-3xl border-border/70 shadow-soft">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                <Landmark className="size-4 text-primary" aria-hidden="true" />
+                Open Finance (Pluggy)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Cadastre suas credenciais do Pluggy para conectar contas e cartões via Open
+                Finance. Crie uma conta gratuita em{" "}
+                <a
+                  href="https://dashboard.pluggy.ai"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-medium text-primary underline underline-offset-2"
+                >
+                  dashboard.pluggy.ai
+                </a>{" "}
+                para obter suas credenciais.
+              </p>
+              {pluggyCredentialsStatus?.hasCredentials ? (
+                <div className="flex items-center justify-between rounded-2xl bg-surface-2 p-3">
+                  <div className="flex items-center gap-3">
+                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
+                      <KeyRound className="size-4" aria-hidden="true" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium">Credenciais configuradas</p>
+                      <p className="text-xs text-muted-foreground">••••••••••••••••</p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={() => removePluggyCredentialsMutation.mutate()}
+                    disabled={removePluggyCredentialsMutation.isPending}
+                  >
+                    Remover
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Input
+                    placeholder="Client ID"
+                    value={pluggyClientIdInput}
+                    onChange={(e) => setPluggyClientIdInput(e.target.value)}
+                    className="h-11 rounded-xl"
+                  />
+                  <div className="relative">
+                    <Input
+                      type={showPluggySecret ? "text" : "password"}
+                      placeholder="Client Secret"
+                      value={pluggyClientSecretInput}
+                      onChange={(e) => setPluggyClientSecretInput(e.target.value)}
+                      className="h-11 rounded-xl pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPluggySecret((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                      aria-label={showPluggySecret ? "Ocultar segredo" : "Mostrar segredo"}
+                    >
+                      {showPluggySecret ? (
+                        <EyeOff className="size-4" aria-hidden="true" />
+                      ) : (
+                        <Eye className="size-4" aria-hidden="true" />
+                      )}
+                    </button>
+                  </div>
+                  <Button
+                    className="w-full rounded-xl bg-gradient-brand font-semibold"
+                    onClick={handleSavePluggyCredentials}
+                    disabled={
+                      !pluggyClientIdInput.trim() ||
+                      !pluggyClientSecretInput.trim() ||
+                      savePluggyCredentialsMutation.isPending
+                    }
+                  >
+                    Salvar credenciais
                   </Button>
                 </div>
               )}

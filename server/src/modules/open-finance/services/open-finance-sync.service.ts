@@ -41,8 +41,8 @@ export class OpenFinanceSyncService {
 
     try {
       const [pluggyAccounts, transactions] = await Promise.all([
-        this.pluggyClient.listAccounts(account.connection.providerItemId),
-        this.pluggyClient.listTransactions(account.externalAccountId, {
+        this.pluggyClient.listAccounts(account.userId, account.connection.providerItemId),
+        this.pluggyClient.listTransactions(account.userId, account.externalAccountId, {
           from: this.resolveSyncFrom(account.lastSyncAt),
           to: formatDateOnly(new Date()),
         }),

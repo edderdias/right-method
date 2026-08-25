@@ -45,7 +45,9 @@ describe("AiChatService", () => {
     conversations = { assertOwnership: jest.fn() };
     context = { buildContext: jest.fn().mockResolvedValue(FAKE_CONTEXT) };
     provider = { complete: jest.fn().mockResolvedValue({ content: "Você gastou R$ 7.000." }) };
-    users = { getOpenAiApiKey: jest.fn().mockResolvedValue("sk-user-key") };
+    users = {
+      getAiCredentials: jest.fn().mockResolvedValue({ provider: "OPENAI", apiKey: "sk-user-key" }),
+    };
     service = new AiChatService(prisma, config, conversations, context, provider, users);
   });
 
@@ -70,6 +72,7 @@ describe("AiChatService", () => {
 
     expect(context.buildContext).toHaveBeenCalledWith("user-1");
     expect(provider.complete).toHaveBeenCalledWith(
+      "OPENAI",
       [],
       "Quanto gastei este mês?",
       FAKE_CONTEXT,
@@ -77,8 +80,8 @@ describe("AiChatService", () => {
     );
   });
 
-  it("refuses to call the provider when the user has no OpenAI key configured", async () => {
-    users.getOpenAiApiKey.mockResolvedValue(null);
+  it("refuses to call the provider when the user has no AI key configured", async () => {
+    users.getAiCredentials.mockResolvedValue(null);
     conversations.assertOwnership.mockResolvedValue({ id: "conv-1", title: "Nova conversa" });
 
     await expect(service.sendMessage("user-1", "conv-1", "Oi")).rejects.toThrow(

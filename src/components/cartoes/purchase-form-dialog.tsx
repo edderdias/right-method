@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -104,6 +105,12 @@ export function PurchaseFormDialog({
     defaultValues: toFormDefaults(purchase),
   });
   const isInstallment = form.watch("isInstallment");
+
+  useEffect(() => {
+    if (open) {
+      form.reset(toFormDefaults(purchase));
+    }
+  }, [open, purchase, form]);
 
   function handleSubmit(values: PurchaseFormValues) {
     const notes = values.notes ? { notes: values.notes } : {};

@@ -1,3 +1,5 @@
+export type AiProvider = "OPENAI" | "ANTHROPIC" | "GOOGLE";
+
 export interface UserProfile {
   id: string;
   name: string;
@@ -16,7 +18,9 @@ export interface UserProfile {
   biometricEnabled: boolean;
   twoFactorEnabled: boolean;
   newDeviceAlertEnabled: boolean;
-  hasOpenAiApiKey: boolean;
+  aiProvider: AiProvider;
+  hasAiApiKey: boolean;
+  hasPluggyCredentials: boolean;
 }
 
 export interface UpdateProfileInput {

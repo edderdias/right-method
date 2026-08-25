@@ -40,7 +40,7 @@ export class OpenFinanceCreditCardsService {
   /** Pluggy CREDIT accounts under a connection that haven't been added as a CreditCard yet. */
   async listAvailable(userId: string, connectionId: string): Promise<PluggyAccount[]> {
     const connection = await this.assertConnectionOwnership(userId, connectionId);
-    const pluggyAccounts = await this.pluggyClient.listAccounts(connection.providerItemId);
+    const pluggyAccounts = await this.pluggyClient.listAccounts(userId, connection.providerItemId);
 
     const importedExternalIds = new Set(
       (
@@ -58,7 +58,7 @@ export class OpenFinanceCreditCardsService {
 
   async addCard(userId: string, connectionId: string, externalCardId: string) {
     const connection = await this.assertConnectionOwnership(userId, connectionId);
-    const pluggyAccounts = await this.pluggyClient.listAccounts(connection.providerItemId);
+    const pluggyAccounts = await this.pluggyClient.listAccounts(userId, connection.providerItemId);
     const pluggyAccount = pluggyAccounts.find(
       (account) => account.id === externalCardId && account.type === "CREDIT",
     );
@@ -100,8 +100,8 @@ export class OpenFinanceCreditCardsService {
 
     try {
       const [pluggyAccounts, transactions] = await Promise.all([
-        this.pluggyClient.listAccounts(card.connection.providerItemId),
-        this.pluggyClient.listTransactions(card.externalCardId, {
+        this.pluggyClient.listAccounts(userId, card.connection.providerItemId),
+        this.pluggyClient.listTransactions(userId, card.externalCardId, {
           from: this.resolveSyncFrom(card.lastSyncAt),
           to: formatDateOnly(new Date()),
         }),
@@ -128,7 +128,7 @@ export class OpenFinanceCreditCardsService {
         let billInfo = metadata.billId ? billCache.get(metadata.billId) : undefined;
         if (!billInfo && metadata.billId) {
           try {
-            const bill = await this.pluggyClient.getBill(metadata.billId);
+            const bill = await this.pluggyClient.getBill(userId, metadata.billId);
             billInfo = {
               closingDate: bill.billClosingDate
                 ? parseDateOnly(bill.billClosingDate)

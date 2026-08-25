@@ -24,8 +24,7 @@ export const envSchema = z.object({
     .transform((v) => v === "true")
     .default("false"),
 
-  PLUGGY_CLIENT_ID: z.string().min(1),
-  PLUGGY_CLIENT_SECRET: z.string().min(1),
+  /** Pluggy client ID/secret are no longer global — each user registers their own in Configurações. */
   PLUGGY_BASE_URL: z.string().url().default("https://api.pluggy.ai"),
   PLUGGY_WEBHOOK_SECRET: z.string().min(16),
   OPEN_FINANCE_INITIAL_SYNC_DAYS: z.coerce.number().default(365),
@@ -33,10 +32,20 @@ export const envSchema = z.object({
    * Optional — without it, accounts still sync via the manual "Sincronizar agora" action. */
   API_PUBLIC_URL: z.preprocess((v) => (v === "" ? undefined : v), z.string().url().optional()),
 
-  /** Optional global fallback — normally each user configures their own key in Configurações. */
+  /** Optional global fallback — normally each user configures their own key (and provider) in
+   * Configurações. The fallback is always OpenAI; Anthropic/Google require a per-user key. */
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
+
+  ANTHROPIC_MODEL: z.string().default("claude-sonnet-5"),
+  ANTHROPIC_BASE_URL: z.string().url().default("https://api.anthropic.com/v1"),
+
+  GOOGLE_MODEL: z.string().default("gemini-2.0-flash"),
+  GOOGLE_BASE_URL: z
+    .string()
+    .url()
+    .default("https://generativelanguage.googleapis.com/v1beta"),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;
