@@ -1,12 +1,13 @@
 import { Injectable } from "@nestjs/common";
-import { AiMessageRole, type AiMessage } from "@prisma/client";
+import { AiMessageRole, AiProvider, type AiMessage } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { AppConfigService } from "../../config/app-config.service";
 import { AiApiKeyMissingException } from "../../common/exceptions/app.exception";
 import { UsersService } from "../users/users.service";
 import { AiConversationsService } from "./ai-conversations.service";
 import { AiContextService } from "./ai-context.service";
-import { OpenAiProviderService, type ChatHistoryEntry } from "./openai-provider.service";
+import { AiProviderRegistry } from "./providers/ai-provider-registry.service";
+import type { ChatHistoryEntry } from "./providers/ai-provider.interface";
 
 const HISTORY_LIMIT = 20;
 const AUTO_TITLE_LENGTH = 60;
@@ -23,7 +24,7 @@ export class AiChatService {
     private readonly config: AppConfigService,
     private readonly conversations: AiConversationsService,
     private readonly context: AiContextService,
-    private readonly provider: OpenAiProviderService,
+    private readonly providerRegistry: AiProviderRegistry,
     private readonly users: UsersService,
   ) {}
 
@@ -44,13 +45,21 @@ export class AiChatService {
       .reverse()
       .map((m) => ({ role: m.role, content: m.content }));
 
-    const apiKey = (await this.users.getOpenAiApiKey(userId)) ?? this.config.get("OPENAI_API_KEY");
+    const credentials = await this.users.getAiCredentials(userId);
+    const apiKey = credentials?.apiKey ?? this.config.get("OPENAI_API_KEY");
     if (!apiKey) {
       throw new AiApiKeyMissingException();
     }
+    const provider = credentials?.provider ?? AiProvider.OPENAI;
 
     const financialContext = await this.context.buildContext(userId);
-    const completion = await this.provider.complete(history, text, financialContext, apiKey);
+    const completion = await this.providerRegistry.complete(
+      provider,
+      history,
+      text,
+      financialContext,
+      apiKey,
+    );
 
     const [userMessage, assistantMessage] = await this.prisma.$transaction([
       this.prisma.aiMessage.create({

@@ -1,25 +1,35 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import type { AiConversation, AiConversationDetail, SendAiMessageResult } from "@/types/ai";
+import type { AiProvider } from "@/types/user";
 
 interface ApiEnvelope<T> {
   message: string;
   data: T;
 }
 
-export async function getOpenAiKeyStatus(): Promise<{ hasKey: boolean }> {
-  const { data } = await apiGet<ApiEnvelope<{ hasKey: boolean }>>("/users/me/openai-key");
+export interface AiCredentialsStatus {
+  provider: AiProvider;
+  hasKey: boolean;
+}
+
+export async function getAiCredentialsStatus(): Promise<AiCredentialsStatus> {
+  const { data } = await apiGet<ApiEnvelope<AiCredentialsStatus>>("/users/me/ai-credentials");
   return data;
 }
 
-export async function saveOpenAiKey(apiKey: string): Promise<{ hasKey: boolean }> {
-  const { data } = await apiPatch<ApiEnvelope<{ hasKey: boolean }>>("/users/me/openai-key", {
+export async function saveAiCredentials(
+  provider: AiProvider,
+  apiKey: string,
+): Promise<AiCredentialsStatus> {
+  const { data } = await apiPatch<ApiEnvelope<AiCredentialsStatus>>("/users/me/ai-credentials", {
+    provider,
     apiKey,
   });
   return data;
 }
 
-export async function removeOpenAiKey(): Promise<{ hasKey: boolean }> {
-  const { data } = await apiDelete<ApiEnvelope<{ hasKey: boolean }>>("/users/me/openai-key");
+export async function removeAiCredentials(): Promise<AiCredentialsStatus> {
+  const { data } = await apiDelete<ApiEnvelope<AiCredentialsStatus>>("/users/me/ai-credentials");
   return data;
 }
 

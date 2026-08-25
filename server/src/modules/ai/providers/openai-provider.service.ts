@@ -1,19 +1,9 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { AppConfigService } from "../../config/app-config.service";
-import { AiProviderException } from "../../common/exceptions/app.exception";
-import { CERTO_IA_SYSTEM_PROMPT } from "./system-prompt";
-import type { AiFinancialContext } from "./ai-context.service";
-
-export interface ChatHistoryEntry {
-  role: "USER" | "ASSISTANT";
-  content: string;
-}
-
-export interface AiCompletion {
-  content: string;
-  suggestedRoute?: string;
-  suggestedLabel?: string;
-}
+import { AppConfigService } from "../../../config/app-config.service";
+import { AiProviderException } from "../../../common/exceptions/app.exception";
+import { CERTO_IA_SYSTEM_PROMPT } from "../system-prompt";
+import type { AiFinancialContext } from "../ai-context.service";
+import type { AiCompletion, AiProviderAdapter, ChatHistoryEntry } from "./ai-provider.interface";
 
 const RESPONSE_SCHEMA = {
   name: "certo_ia_reply",
@@ -33,7 +23,7 @@ const RESPONSE_SCHEMA = {
 /** Thin fetch wrapper over the OpenAI Chat Completions API, mirroring the plain-fetch style of
  * PluggyClientService — no extra HTTP client dependency. */
 @Injectable()
-export class OpenAiProviderService {
+export class OpenAiProviderService implements AiProviderAdapter {
   private readonly logger = new Logger(OpenAiProviderService.name);
 
   constructor(private readonly config: AppConfigService) {}

@@ -77,7 +77,9 @@ export class OpenFinanceAccountsService {
     });
 
     if (remainingActiveAccounts === 0) {
-      await this.pluggyClient.deleteItem(account.connection.providerItemId).catch(() => undefined);
+      await this.pluggyClient
+        .deleteItem(userId, account.connection.providerItemId)
+        .catch(() => undefined);
       await this.prisma.openFinanceConnection.update({
         where: { id: account.connectionId },
         data: { status: ConnectionStatus.DISCONNECTED },

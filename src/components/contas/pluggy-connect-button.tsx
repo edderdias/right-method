@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useNavigate } from "@tanstack/react-router";
 import { Link2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button, type ButtonProps } from "@/components/ui/button";
 import { useCreateConnectToken, useCreateConnection } from "@/hooks/use-open-finance";
+import { useCurrentUser } from "@/hooks/use-user-settings";
 import { openPluggyConnect } from "@/lib/pluggy-connect";
 import type { RegisterConnectionResponse } from "@/types/open-finance";
 import { SelectAccountsDialog } from "./select-accounts-dialog";
@@ -23,10 +25,19 @@ export function PluggyConnectButton({
 }: PluggyConnectButtonProps) {
   const createConnectToken = useCreateConnectToken();
   const createConnection = useCreateConnection();
+  const { data: currentUser } = useCurrentUser();
+  const navigate = useNavigate();
   const [opening, setOpening] = useState(false);
   const [registration, setRegistration] = useState<RegisterConnectionResponse | null>(null);
 
   async function handleClick() {
+    if (!currentUser?.hasPluggyCredentials) {
+      toast.error(
+        "Você ainda não cadastrou suas credenciais do Pluggy. Adquira suas credenciais em dashboard.pluggy.ai e cadastre-as em Configurações para conectar uma conta.",
+        { action: { label: "Configurações", onClick: () => navigate({ to: "/configuracoes" }) } },
+      );
+      return;
+    }
     setOpening(true);
     try {
       const accessToken = await createConnectToken.mutateAsync(reconnectItemId);

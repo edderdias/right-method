@@ -5,6 +5,9 @@ import { ApiError } from "@/lib/api-client";
 import {
   changePassword,
   getCurrentUser,
+  getPluggyCredentialsStatus,
+  removePluggyCredentials,
+  savePluggyCredentials,
   updateNotificationPreferences,
   updateProfile,
   updateSecurityPreferences,
@@ -16,6 +19,7 @@ import type {
 } from "@/types/user";
 
 export const currentUserKey = ["auth", "me"] as const;
+export const pluggyCredentialsStatusKey = ["users", "pluggy-credentials"] as const;
 
 const GENERIC_ERROR_MESSAGE = "Não foi possível completar a operação. Tente novamente.";
 
@@ -56,6 +60,37 @@ export function useUpdateSecurityPreferences() {
     mutationFn: (input: Partial<SecurityPreferences>) => updateSecurityPreferences(input),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: currentUserKey });
+    },
+    onError: (error) => toast.error(toErrorMessage(error)),
+  });
+}
+
+export function usePluggyCredentialsStatus() {
+  return useQuery({ queryKey: pluggyCredentialsStatusKey, queryFn: getPluggyCredentialsStatus });
+}
+
+export function useSavePluggyCredentials() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ clientId, clientSecret }: { clientId: string; clientSecret: string }) =>
+      savePluggyCredentials(clientId, clientSecret),
+    onSuccess: (data) => {
+      queryClient.setQueryData(pluggyCredentialsStatusKey, data);
+      void queryClient.invalidateQueries({ queryKey: currentUserKey });
+      toast.success("Credenciais do Pluggy salvas com sucesso.");
+    },
+    onError: (error) => toast.error(toErrorMessage(error)),
+  });
+}
+
+export function useRemovePluggyCredentials() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: removePluggyCredentials,
+    onSuccess: (data) => {
+      queryClient.setQueryData(pluggyCredentialsStatusKey, data);
+      void queryClient.invalidateQueries({ queryKey: currentUserKey });
+      toast.success("Credenciais do Pluggy removidas.");
     },
     onError: (error) => toast.error(toErrorMessage(error)),
   });

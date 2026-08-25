@@ -1,4 +1,4 @@
-import { apiGet, apiPatch } from "@/lib/api-client";
+import { apiDelete, apiGet, apiPatch } from "@/lib/api-client";
 import type {
   NotificationPreferences,
   SecurityPreferences,
@@ -32,6 +32,31 @@ export async function updateSecurityPreferences(
   input: Partial<SecurityPreferences>,
 ): Promise<UserProfile> {
   const { data } = await apiPatch<ApiEnvelope<UserProfile>>("/users/me/security", input);
+  return data;
+}
+
+export async function getPluggyCredentialsStatus(): Promise<{ hasCredentials: boolean }> {
+  const { data } = await apiGet<ApiEnvelope<{ hasCredentials: boolean }>>(
+    "/users/me/pluggy-credentials",
+  );
+  return data;
+}
+
+export async function savePluggyCredentials(
+  clientId: string,
+  clientSecret: string,
+): Promise<{ hasCredentials: boolean }> {
+  const { data } = await apiPatch<ApiEnvelope<{ hasCredentials: boolean }>>(
+    "/users/me/pluggy-credentials",
+    { clientId, clientSecret },
+  );
+  return data;
+}
+
+export async function removePluggyCredentials(): Promise<{ hasCredentials: boolean }> {
+  const { data } = await apiDelete<ApiEnvelope<{ hasCredentials: boolean }>>(
+    "/users/me/pluggy-credentials",
+  );
   return data;
 }
 

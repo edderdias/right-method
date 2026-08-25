@@ -3,7 +3,8 @@ import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import type { JwtPayload } from "../../common/types/authenticated-request";
 import { UsersService } from "./users.service";
-import { SetOpenAiKeyDto } from "./dto/set-openai-key.dto";
+import { SetAiCredentialsDto } from "./dto/set-ai-credentials.dto";
+import { SetPluggyCredentialsDto } from "./dto/set-pluggy-credentials.dto";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
 import { UpdateNotificationPreferencesDto } from "./dto/update-notification-preferences.dto";
 import { UpdateSecurityPreferencesDto } from "./dto/update-security-preferences.dto";
@@ -47,24 +48,62 @@ export class UsersController {
     };
   }
 
-  @Get("openai-key")
-  @ApiOperation({ summary: "Indica se o usuário já configurou uma chave da OpenAI" })
-  async getOpenAiKeyStatus(@CurrentUser() user: JwtPayload) {
-    const apiKey = await this.usersService.getOpenAiApiKey(user.sub);
-    return { message: "Status da chave da OpenAI.", data: { hasKey: apiKey !== null } };
+  @Get("ai-credentials")
+  @ApiOperation({ summary: "Indica o provedor de IA ativo e se o usuário já configurou uma chave" })
+  async getAiCredentialsStatus(@CurrentUser() user: JwtPayload) {
+    const credentials = await this.usersService.getAiCredentials(user.sub);
+    const profile = await this.usersService.findById(user.sub);
+    return {
+      message: "Status das credenciais de IA.",
+      data: { provider: profile?.aiProvider, hasKey: credentials !== null },
+    };
   }
 
-  @Patch("openai-key")
-  @ApiOperation({ summary: "Salva a chave da API OpenAI do usuário para o Certo IA" })
-  async setOpenAiKey(@CurrentUser() user: JwtPayload, @Body() dto: SetOpenAiKeyDto) {
-    await this.usersService.setOpenAiApiKey(user.sub, dto.apiKey);
-    return { message: "Chave da OpenAI salva com sucesso.", data: { hasKey: true } };
+  @Patch("ai-credentials")
+  @ApiOperation({ summary: "Salva o provedor e a chave de IA do usuário para o Certo IA" })
+  async setAiCredentials(@CurrentUser() user: JwtPayload, @Body() dto: SetAiCredentialsDto) {
+    await this.usersService.setAiCredentials(user.sub, dto.provider, dto.apiKey);
+    return {
+      message: "Credenciais de IA salvas com sucesso.",
+      data: { provider: dto.provider, hasKey: true },
+    };
   }
 
-  @Delete("openai-key")
-  @ApiOperation({ summary: "Remove a chave da API OpenAI do usuário" })
-  async removeOpenAiKey(@CurrentUser() user: JwtPayload) {
-    await this.usersService.clearOpenAiApiKey(user.sub);
-    return { message: "Chave da OpenAI removida.", data: { hasKey: false } };
+  @Delete("ai-credentials")
+  @ApiOperation({ summary: "Remove a chave de IA do usuário" })
+  async removeAiCredentials(@CurrentUser() user: JwtPayload) {
+    await this.usersService.clearAiCredentials(user.sub);
+    const profile = await this.usersService.findById(user.sub);
+    return {
+      message: "Credenciais de IA removidas.",
+      data: { provider: profile?.aiProvider, hasKey: false },
+    };
+  }
+
+  @Get("pluggy-credentials")
+  @ApiOperation({ summary: "Indica se o usuário já configurou credenciais do Pluggy" })
+  async getPluggyCredentialsStatus(@CurrentUser() user: JwtPayload) {
+    const credentials = await this.usersService.getPluggyCredentials(user.sub);
+    return {
+      message: "Status das credenciais do Pluggy.",
+      data: { hasCredentials: credentials !== null },
+    };
+  }
+
+  @Patch("pluggy-credentials")
+  @ApiOperation({ summary: "Salva as credenciais do Pluggy do usuário para o Open Finance" })
+  async setPluggyCredentials(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: SetPluggyCredentialsDto,
+  ) {
+    await this.usersService.setPluggyCredentials(user.sub, dto.clientId, dto.clientSecret);
+    return { message: "Credenciais do Pluggy salvas com sucesso.", data: { hasCredentials: true } };
+  }
+
+  @Delete("pluggy-credentials")
+  @ApiOperation({ summary: "Remove as credenciais do Pluggy do usuário" })
+  async removePluggyCredentials(@CurrentUser() user: JwtPayload) {
+    await this.usersService.clearPluggyCredentials(user.sub);
+    return { message: "Credenciais do Pluggy removidas.", data: { hasCredentials: false } };
   }
 }

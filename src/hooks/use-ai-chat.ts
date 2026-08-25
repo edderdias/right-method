@@ -6,19 +6,20 @@ import {
   createAiConversation,
   deleteAiConversation,
   getAiConversation,
-  getOpenAiKeyStatus,
+  getAiCredentialsStatus,
   listAiConversations,
-  removeOpenAiKey,
+  removeAiCredentials,
   renameAiConversation,
-  saveOpenAiKey,
+  saveAiCredentials,
   sendAiMessage,
 } from "@/lib/ai-api";
 import type { AiConversationDetail } from "@/types/ai";
+import type { AiProvider } from "@/types/user";
 
 export const aiKeys = {
   conversations: ["ai", "conversations"] as const,
   conversation: (id: string) => ["ai", "conversations", id] as const,
-  openAiKeyStatus: ["ai", "openai-key"] as const,
+  credentialsStatus: ["ai", "credentials"] as const,
 };
 
 const GENERIC_ERROR_MESSAGE = "Não foi possível falar com o Certo IA agora. Tente novamente.";
@@ -73,29 +74,30 @@ export function useDeleteAiConversation() {
   });
 }
 
-export function useOpenAiKeyStatus() {
-  return useQuery({ queryKey: aiKeys.openAiKeyStatus, queryFn: getOpenAiKeyStatus });
+export function useAiCredentialsStatus() {
+  return useQuery({ queryKey: aiKeys.credentialsStatus, queryFn: getAiCredentialsStatus });
 }
 
-export function useSaveOpenAiKey() {
+export function useSaveAiCredentials() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: saveOpenAiKey,
+    mutationFn: ({ provider, apiKey }: { provider: AiProvider; apiKey: string }) =>
+      saveAiCredentials(provider, apiKey),
     onSuccess: (data) => {
-      queryClient.setQueryData(aiKeys.openAiKeyStatus, data);
-      toast.success("Chave da OpenAI salva com sucesso.");
+      queryClient.setQueryData(aiKeys.credentialsStatus, data);
+      toast.success("Credenciais de IA salvas com sucesso.");
     },
     onError: (error) => toast.error(toErrorMessage(error)),
   });
 }
 
-export function useRemoveOpenAiKey() {
+export function useRemoveAiCredentials() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: removeOpenAiKey,
+    mutationFn: removeAiCredentials,
     onSuccess: (data) => {
-      queryClient.setQueryData(aiKeys.openAiKeyStatus, data);
-      toast.success("Chave da OpenAI removida.");
+      queryClient.setQueryData(aiKeys.credentialsStatus, data);
+      toast.success("Credenciais de IA removidas.");
     },
     onError: (error) => toast.error(toErrorMessage(error)),
   });

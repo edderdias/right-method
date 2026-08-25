@@ -156,6 +156,16 @@ export class OpenFinanceSyncFailedException extends AppException {
   }
 }
 
+export class PluggyCredentialsMissingException extends AppException {
+  constructor() {
+    super(
+      "PLUGGY_CREDENTIALS_MISSING",
+      "Você ainda não cadastrou suas credenciais do Pluggy. Adquira suas credenciais em https://dashboard.pluggy.ai e cadastre-as em Configurações para conectar uma conta.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
 export class OpenFinanceWebhookUnauthorizedException extends AppException {
   constructor() {
     super("OPEN_FINANCE_WEBHOOK_UNAUTHORIZED", "Webhook não autorizado.", HttpStatus.UNAUTHORIZED);

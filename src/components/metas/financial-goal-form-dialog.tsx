@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -111,9 +112,15 @@ export function FinancialGoalFormDialog({
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
-    values: toFormDefaults(goal),
+    defaultValues: toFormDefaults(goal),
   });
   const category = form.watch("category");
+
+  useEffect(() => {
+    if (open) {
+      form.reset(toFormDefaults(goal));
+    }
+  }, [open, goal, form]);
 
   const expensesPoints = expensesEvolutionQuery.data ?? [];
   const avgMonthlyExpenses =

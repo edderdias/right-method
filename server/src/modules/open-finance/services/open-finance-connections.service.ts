@@ -38,8 +38,8 @@ export class OpenFinanceConnectionsService {
     itemId: string,
   ): Promise<{ connection: ConnectionWithAccounts; availableAccounts: PluggyAccount[] }> {
     const [item, pluggyAccounts] = await Promise.all([
-      this.pluggyClient.getItem(itemId),
-      this.pluggyClient.listAccounts(itemId),
+      this.pluggyClient.getItem(userId, itemId),
+      this.pluggyClient.listAccounts(userId, itemId),
     ]);
 
     const connection = await this.prisma.openFinanceConnection.upsert({
@@ -87,7 +87,7 @@ export class OpenFinanceConnectionsService {
     metadata: RequestMetadata,
   ): Promise<void> {
     const connection = await this.assertOwnership(userId, connectionId);
-    const pluggyAccounts = await this.pluggyClient.listAccounts(connection.providerItemId);
+    const pluggyAccounts = await this.pluggyClient.listAccounts(userId, connection.providerItemId);
     const byId = new Map(pluggyAccounts.map((account) => [account.id, account]));
 
     for (const externalAccountId of externalAccountIds) {
@@ -127,7 +127,7 @@ export class OpenFinanceConnectionsService {
   ): Promise<void> {
     const connection = await this.assertOwnership(userId, connectionId);
 
-    await this.pluggyClient.deleteItem(connection.providerItemId).catch(() => undefined);
+    await this.pluggyClient.deleteItem(userId, connection.providerItemId).catch(() => undefined);
 
     await this.prisma.$transaction([
       this.prisma.connectedAccount.updateMany({
@@ -154,7 +154,7 @@ export class OpenFinanceConnectionsService {
     });
     if (!connection) return null;
 
-    const item = await this.pluggyClient.getItem(providerItemId);
+    const item = await this.pluggyClient.getItem(connection.userId, providerItemId);
     await this.prisma.openFinanceConnection.update({
       where: { id: connection.id },
       data: {
