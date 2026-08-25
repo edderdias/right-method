@@ -36,6 +36,7 @@ import { useExpensesByCategory, useExpensesEvolution } from "@/hooks/use-expense
 import { useCreditCardsSummary } from "@/hooks/use-credit-cards";
 import { useFinancialGoals, useFinancialGoalsSummary } from "@/hooks/use-financial-goals";
 import { useInvestmentsSummary } from "@/hooks/use-investments";
+import { useCurrentUser } from "@/hooks/use-user-settings";
 import { formatMonthKeyShort } from "@/lib/finance-format";
 import { cn } from "@/lib/utils";
 
@@ -80,6 +81,8 @@ const insights = [
 ];
 
 function DashboardPage() {
+  const currentUserQuery = useCurrentUser();
+  const firstName = currentUserQuery.data?.name.split(" ")[0];
   const summaryQuery = useDashboardSummary({});
   const revenuesEvolutionQuery = useRevenuesEvolution(6);
   const expensesEvolutionQuery = useExpensesEvolution(6);
@@ -116,7 +119,9 @@ function DashboardPage() {
   return (
     <AppShell>
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Olá, Marina</h1>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {firstName ? `Olá, ${firstName}` : "Olá"}
+        </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Aqui está o resumo das suas finanças no período.
         </p>
