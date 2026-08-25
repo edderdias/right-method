@@ -57,7 +57,7 @@ export class AuthService {
       user.id,
       VerificationTokenType.EMAIL_VERIFICATION,
     );
-    await this.emailService.sendEmailVerification(
+    void this.emailService.sendEmailVerification(
       user.email,
       user.name,
       this.buildFrontendUrl("verify-email", verificationToken),
