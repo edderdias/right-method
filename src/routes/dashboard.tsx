@@ -29,6 +29,7 @@ import {
 import { AppShell, brl } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { MaskableAmount } from "@/components/ui/maskable-amount";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboardSummary, useRevenuesEvolution } from "@/hooks/use-revenues";
@@ -134,7 +135,7 @@ function DashboardPage() {
             summaryQuery.isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              brl(summaryQuery.data?.currentBalance ?? 0)
+              <MaskableAmount value={brl(summaryQuery.data?.currentBalance ?? 0)} />
             )
           }
           positive
@@ -147,7 +148,7 @@ function DashboardPage() {
             summaryQuery.isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              brl(summaryQuery.data?.income.total ?? 0)
+              <MaskableAmount value={brl(summaryQuery.data?.income.total ?? 0)} />
             )
           }
           positive
@@ -159,14 +160,20 @@ function DashboardPage() {
             summaryQuery.isLoading ? (
               <Skeleton className="h-8 w-24" />
             ) : (
-              brl(summaryQuery.data?.expenses.total ?? 0)
+              <MaskableAmount value={brl(summaryQuery.data?.expenses.total ?? 0)} />
             )
           }
           icon={ArrowDownRight}
         />
         <StatCard
           title="Patrimônio"
-          value={patrimonioLoading ? <Skeleton className="h-8 w-24" /> : brl(patrimonioTotal)}
+          value={
+            patrimonioLoading ? (
+              <Skeleton className="h-8 w-24" />
+            ) : (
+              <MaskableAmount value={brl(patrimonioTotal)} />
+            )
+          }
           positive
           icon={PiggyBank}
         />
@@ -282,7 +289,9 @@ function DashboardPage() {
             ) : (
               <div>
                 <p className="text-xs text-muted-foreground">Contas + investimentos</p>
-                <p className="mt-1 text-3xl font-semibold tracking-tight">{brl(patrimonioTotal)}</p>
+                <p className="mt-1 text-3xl font-semibold tracking-tight">
+                  <MaskableAmount value={brl(patrimonioTotal)} />
+                </p>
               </div>
             )}
             <div className="grid grid-cols-2 gap-4 border-t border-border/70 pt-4">
@@ -292,7 +301,7 @@ function DashboardPage() {
                   <Skeleton className="mt-1 h-6 w-24" />
                 ) : (
                   <p className="text-sm font-semibold">
-                    {brl(summaryQuery.data?.currentBalance ?? 0)}
+                    <MaskableAmount value={brl(summaryQuery.data?.currentBalance ?? 0)} />
                   </p>
                 )}
               </div>
@@ -302,7 +311,7 @@ function DashboardPage() {
                   <Skeleton className="mt-1 h-6 w-24" />
                 ) : (
                   <p className="text-sm font-semibold">
-                    {brl(investmentsSummary?.totalCurrentValue ?? 0)}
+                    <MaskableAmount value={brl(investmentsSummary?.totalCurrentValue ?? 0)} />
                   </p>
                 )}
               </div>
@@ -407,7 +416,7 @@ function DashboardPage() {
                   </div>
                   <p className="mt-8 text-sm opacity-80">Faturas em aberto</p>
                   <p className="text-2xl font-semibold">
-                    {brl(creditCardsSummary.openInvoicesTotal)}
+                    <MaskableAmount value={brl(creditCardsSummary.openInvoicesTotal)} />
                   </p>
                 </div>
                 <div className="space-y-2">
@@ -417,8 +426,8 @@ function DashboardPage() {
                   </div>
                   <Progress value={creditCardsUsedPct} className="h-2" />
                   <p className="text-xs text-muted-foreground">
-                    Disponível {brl(creditCardsSummary.totalAvailable)} de{" "}
-                    {brl(creditCardsSummary.totalLimit)}
+                    Disponível <MaskableAmount value={brl(creditCardsSummary.totalAvailable)} /> de{" "}
+                    <MaskableAmount value={brl(creditCardsSummary.totalLimit)} />
                   </p>
                 </div>
               </>

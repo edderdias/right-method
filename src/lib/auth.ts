@@ -1,4 +1,8 @@
 import { redirect } from "@tanstack/react-router";
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/browser";
 
 import { apiPost } from "@/lib/api-client";
 
@@ -23,6 +27,15 @@ interface LoginResponse {
   data: AuthTokens & { user: AuthUser };
 }
 
+interface LoginApiResponse {
+  message: string;
+  data: (AuthTokens & { user: AuthUser }) | { requires2FA: true; challengeToken: string };
+}
+
+export type LoginResult =
+  | { requires2FA: false; user: AuthUser }
+  | { requires2FA: true; challengeToken: string };
+
 export function getAccessToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(ACCESS_TOKEN_KEY);
@@ -38,8 +51,47 @@ export function clearSession(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
-export async function login(email: string, password: string): Promise<AuthUser> {
-  const { data } = await apiPost<LoginResponse>("/auth/login", { email, password });
+export async function login(email: string, password: string): Promise<LoginResult> {
+  const { data } = await apiPost<LoginApiResponse>("/auth/login", { email, password });
+  if ("requires2FA" in data) {
+    return data;
+  }
+  localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  return { requires2FA: false, user: data.user };
+}
+
+export async function verifyTwoFactorLogin(
+  challengeToken: string,
+  code: string,
+): Promise<AuthUser> {
+  const { data } = await apiPost<LoginResponse>("/auth/2fa/verify", { challengeToken, code });
+  localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
+  localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  return data.user;
+}
+
+interface WebAuthnLoginOptionsResponse {
+  message: string;
+  data: { options: PublicKeyCredentialRequestOptionsJSON; ceremonyId: string };
+}
+
+export async function getWebAuthnLoginOptions(): Promise<{
+  options: PublicKeyCredentialRequestOptionsJSON;
+  ceremonyId: string;
+}> {
+  const { data } = await apiPost<WebAuthnLoginOptionsResponse>("/auth/webauthn/login-options", {});
+  return data;
+}
+
+export async function verifyWebAuthnLogin(
+  ceremonyId: string,
+  response: AuthenticationResponseJSON,
+): Promise<AuthUser> {
+  const { data } = await apiPost<LoginResponse>("/auth/webauthn/login-verify", {
+    ceremonyId,
+    response,
+  });
   localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
   localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
   return data.user;

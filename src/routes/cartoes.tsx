@@ -12,6 +12,7 @@ import { NewCreditCardDialog } from "@/components/cartoes/new-credit-card-dialog
 import { useCreditCards, useCreditCardsSummary } from "@/hooks/use-credit-cards";
 import { requireAuth } from "@/lib/auth";
 import { formatBRL } from "@/lib/finance-format";
+import { MaskableAmount } from "@/components/ui/maskable-amount";
 import { cn } from "@/lib/utils";
 import type { CreditCard as CreditCardModel } from "@/types/credit-card";
 
@@ -108,8 +109,10 @@ function CreditCardTile({ card, onArchive }: { card: CreditCardModel; onArchive:
             </div>
             <Progress value={usedPct} className="mt-2 h-2" />
             <p className="mt-2 text-sm font-semibold">
-              {formatBRL(used)}{" "}
-              <span className="font-normal text-muted-foreground">/ {formatBRL(limit)}</span>
+              <MaskableAmount value={formatBRL(used)} />{" "}
+              <span className="font-normal text-muted-foreground">
+                / <MaskableAmount value={formatBRL(limit)} />
+              </span>
             </p>
           </div>
         ) : (
@@ -178,7 +181,7 @@ function CartoesPage() {
               <Skeleton className="mt-2 h-8 w-32" />
             ) : (
               <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {formatBRL(summary?.totalLimit ?? 0)}
+                <MaskableAmount value={formatBRL(summary?.totalLimit ?? 0)} />
               </p>
             )}
             <p className="mt-3 text-xs text-muted-foreground">{cards.length} cartões ativos</p>
@@ -191,7 +194,7 @@ function CartoesPage() {
               <Skeleton className="mt-2 h-8 w-32" />
             ) : (
               <p className="mt-1 text-2xl font-semibold tracking-tight text-primary">
-                {formatBRL(summary?.totalAvailable ?? 0)}
+                <MaskableAmount value={formatBRL(summary?.totalAvailable ?? 0)} />
               </p>
             )}
             <Progress value={usedPct} className="mt-3 h-2" />
@@ -205,7 +208,7 @@ function CartoesPage() {
               <Skeleton className="mt-2 h-8 w-32" />
             ) : (
               <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {formatBRL(summary?.openInvoicesTotal ?? 0)}
+                <MaskableAmount value={formatBRL(summary?.openInvoicesTotal ?? 0)} />
               </p>
             )}
           </CardContent>

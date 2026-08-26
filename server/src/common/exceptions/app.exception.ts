@@ -318,6 +318,58 @@ export class GoalInvestmentAlreadyLinkedException extends AppException {
   }
 }
 
+export class TwoFactorSetupNotFoundException extends AppException {
+  constructor() {
+    super(
+      "TWO_FACTOR_SETUP_NOT_FOUND",
+      "Nenhuma configuração de 2FA pendente. Inicie o processo novamente.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class TwoFactorCodeInvalidException extends AppException {
+  constructor() {
+    super("TWO_FACTOR_CODE_INVALID", "Código de verificação inválido.", HttpStatus.UNAUTHORIZED);
+  }
+}
+
+export class TwoFactorChallengeInvalidException extends AppException {
+  constructor() {
+    super(
+      "TWO_FACTOR_CHALLENGE_INVALID",
+      "Sessão de verificação expirada. Faça login novamente.",
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+}
+
+export class WebAuthnChallengeMissingException extends AppException {
+  constructor() {
+    super(
+      "WEBAUTHN_CHALLENGE_MISSING",
+      "Sessão de verificação expirada. Tente novamente.",
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+}
+
+export class WebAuthnVerificationFailedException extends AppException {
+  constructor() {
+    super(
+      "WEBAUTHN_VERIFICATION_FAILED",
+      "Não foi possível verificar a biometria. Tente novamente.",
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+}
+
+export class NotificationNotFoundException extends AppException {
+  constructor() {
+    super("NOTIFICATION_NOT_FOUND", "Notificação não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
 export class AiConversationNotFoundException extends AppException {
   constructor() {
     super("AI_CONVERSATION_NOT_FOUND", "Conversa não encontrada.", HttpStatus.NOT_FOUND);

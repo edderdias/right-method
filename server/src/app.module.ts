@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ThrottlerGuard } from "@nestjs/throttler";
+import { ScheduleModule } from "@nestjs/schedule";
 import { ConfigModule } from "./config/config.module";
 import { PrismaModule } from "./database/prisma.module";
 import { RedisModule } from "./database/redis.module";
@@ -21,12 +22,14 @@ import { ReportsModule } from "./modules/reports/reports.module";
 import { AiModule } from "./modules/ai/ai.module";
 import { FamilyModule } from "./modules/family/family.module";
 import { FamilyAccessGuard } from "./modules/family/guards/family-access.guard";
+import { NotificationsModule } from "./modules/notifications/notifications.module";
 
 @Module({
   imports: [
     ConfigModule,
     PrismaModule,
     RedisModule,
+    ScheduleModule.forRoot(),
     AuthModule,
     AccountsModule,
     CategoriesModule,
@@ -40,6 +43,7 @@ import { FamilyAccessGuard } from "./modules/family/guards/family-access.guard";
     ReportsModule,
     AiModule,
     FamilyModule,
+    NotificationsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

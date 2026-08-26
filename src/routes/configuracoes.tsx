@@ -36,6 +36,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { PhoneInput } from "@/components/ui/phone-input";
 import {
   Select,
   SelectContent,
@@ -59,6 +61,12 @@ import {
   useSaveAiCredentials,
 } from "@/hooks/use-ai-chat";
 import { useTheme } from "@/hooks/use-theme";
+import {
+  useConfirmTwoFactor,
+  useDisableTwoFactor,
+  useSetupTwoFactor,
+} from "@/hooks/use-two-factor";
+import { useDisableBiometric, useEnableBiometric } from "@/hooks/use-webauthn";
 import {
   useChangePassword,
   useCurrentUser,
@@ -151,7 +159,6 @@ const temas = [
 function ConfiguracoesPage() {
   const navigate = useNavigate();
   const { theme: tema, setTheme: setTema } = useTheme();
-  const [ocultarSaldos, setOcultarSaldos] = useState(false);
 
   const { data: currentUser } = useCurrentUser();
   const updateProfileMutation = useUpdateProfile();
@@ -182,6 +189,50 @@ function ConfiguracoesPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [twoFactorSetupOpen, setTwoFactorSetupOpen] = useState(false);
+  const [twoFactorSetupData, setTwoFactorSetupData] = useState<{
+    otpauthUrl: string;
+    qrCodeDataUrl: string;
+  } | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const setupTwoFactorMutation = useSetupTwoFactor();
+  const confirmTwoFactorMutation = useConfirmTwoFactor();
+  const disableTwoFactorMutation = useDisableTwoFactor();
+  const enableBiometricMutation = useEnableBiometric();
+  const disableBiometricMutation = useDisableBiometric();
+
+  function handleToggleBiometric(checked: boolean) {
+    if (checked) {
+      enableBiometricMutation.mutate();
+    } else {
+      disableBiometricMutation.mutate();
+    }
+  }
+
+  function handleToggleTwoFactor(checked: boolean) {
+    if (!checked) {
+      disableTwoFactorMutation.mutate();
+      return;
+    }
+    setupTwoFactorMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        setTwoFactorSetupData(data);
+        setTwoFactorCode("");
+        setTwoFactorSetupOpen(true);
+      },
+    });
+  }
+
+  function handleConfirmTwoFactor() {
+    confirmTwoFactorMutation.mutate(twoFactorCode, {
+      onSuccess: () => {
+        setTwoFactorSetupOpen(false);
+        setTwoFactorSetupData(null);
+        setTwoFactorCode("");
+      },
+    });
+  }
 
   function handleChangePassword() {
     if (newPassword !== confirmPassword) {
@@ -338,10 +389,10 @@ function ConfiguracoesPage() {
                 <label htmlFor="telefone" className="text-sm font-medium">
                   Telefone
                 </label>
-                <input
+                <PhoneInput
                   id="telefone"
                   value={profileForm.phone}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
+                  onChange={(phone) => setProfileForm((f) => ({ ...f, phone }))}
                   placeholder="(11) 98877-4321"
                   className="mt-2 h-11 w-full rounded-xl border border-input bg-surface px-4 text-sm outline-none focus:ring-2 focus:ring-ring/40"
                 />
@@ -423,8 +474,11 @@ function ConfiguracoesPage() {
               <div className="flex items-center justify-between">
                 <span>Ocultar saldos</span>
                 <Switch
-                  checked={ocultarSaldos}
-                  onCheckedChange={setOcultarSaldos}
+                  checked={currentUser?.hideBalances ?? false}
+                  onCheckedChange={(checked) =>
+                    securityPrefsMutation.mutate({ hideBalances: checked })
+                  }
+                  disabled={securityPrefsMutation.isPending}
                   aria-label="Ocultar saldos"
                 />
               </div>
@@ -657,8 +711,20 @@ function ConfiguracoesPage() {
                 </div>
                 <Switch
                   checked={currentUser?.[s.id] ?? false}
-                  onCheckedChange={(checked) => securityPrefsMutation.mutate({ [s.id]: checked })}
-                  disabled={securityPrefsMutation.isPending}
+                  onCheckedChange={
+                    s.id === "twoFactorEnabled"
+                      ? handleToggleTwoFactor
+                      : s.id === "biometricEnabled"
+                        ? handleToggleBiometric
+                        : (checked) => securityPrefsMutation.mutate({ [s.id]: checked })
+                  }
+                  disabled={
+                    s.id === "twoFactorEnabled"
+                      ? setupTwoFactorMutation.isPending || disableTwoFactorMutation.isPending
+                      : s.id === "biometricEnabled"
+                        ? enableBiometricMutation.isPending || disableBiometricMutation.isPending
+                        : securityPrefsMutation.isPending
+                  }
                   aria-label={s.label}
                 />
               </div>
@@ -917,6 +983,54 @@ function ConfiguracoesPage() {
               }
             >
               Salvar nova senha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={twoFactorSetupOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTwoFactorSetupOpen(false);
+            setTwoFactorSetupData(null);
+            setTwoFactorCode("");
+          }
+        }}
+      >
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ativar autenticação em dois fatores</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Escaneie o QR code com seu app autenticador (Google Authenticator, Authy, etc.) e
+              digite o código gerado para confirmar.
+            </p>
+            {twoFactorSetupData && (
+              <img
+                src={twoFactorSetupData.qrCodeDataUrl}
+                alt="QR code para configurar autenticação em dois fatores"
+                className="mx-auto size-48 rounded-2xl border border-border/70"
+              />
+            )}
+            <div className="flex justify-center">
+              <InputOTP maxLength={6} value={twoFactorCode} onChange={setTwoFactorCode}>
+                <InputOTPGroup>
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <InputOTPSlot key={index} index={index} />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full rounded-xl bg-gradient-brand font-semibold"
+              onClick={handleConfirmTwoFactor}
+              disabled={confirmTwoFactorMutation.isPending || twoFactorCode.length !== 6}
+            >
+              Confirmar e ativar
             </Button>
           </DialogFooter>
         </DialogContent>

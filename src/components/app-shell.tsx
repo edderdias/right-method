@@ -2,7 +2,6 @@ import { useState, type ReactNode } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
   ArrowDownRight,
-  Bell,
   CalendarClock,
   Check,
   ChevronDown,
@@ -20,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { BrandLockup, BrandMark } from "@/components/brand";
+import { NotificationBell } from "@/components/notification-bell";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -150,9 +150,7 @@ export function AppShell({ children }: { children: ReactNode }) {
               />
             </div>
             <div className="ml-auto flex items-center gap-2">
-              <Button variant="ghost" size="icon" className="rounded-xl" aria-label="Notificações">
-                <Bell className="size-5" />
-              </Button>
+              <NotificationBell />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
