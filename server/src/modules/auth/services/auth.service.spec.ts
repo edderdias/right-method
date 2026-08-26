@@ -76,7 +76,7 @@ describe("AuthService", () => {
       hash: jest.fn((t: string) => `hash:${t}`),
       signAccessToken: jest.fn(() => "access-token"),
       generateOpaqueToken: jest.fn(() => ({ token: "refresh-token", hash: "hash:refresh-token" })),
-      accessTokenExpiresInSeconds: 900,
+      accessTokenExpiresInSeconds: 3600,
       refreshTokenExpiresAt: new Date(Date.now() + 1000),
     };
     verificationTokenService = {
@@ -216,7 +216,7 @@ describe("AuthService", () => {
       expect(sessionsService.create).toHaveBeenCalled();
       expect(result.accessToken).toBe("access-token");
       expect(result.refreshToken).toBe("refresh-token");
-      expect(result.expiresIn).toBe(900);
+      expect(result.expiresIn).toBe(3600);
     });
 
     it("sends the new-device alert only when this user agent hasn't logged in before", async () => {

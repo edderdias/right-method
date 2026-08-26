@@ -98,7 +98,7 @@ describe("Auth flow (e2e)", () => {
 
     expect(res.body.data.accessToken).toBeDefined();
     expect(res.body.data.refreshToken).toBeDefined();
-    expect(res.body.data.expiresIn).toBe(900);
+    expect(res.body.data.expiresIn).toBe(3600);
     accessToken = res.body.data.accessToken;
     refreshToken = res.body.data.refreshToken;
   });

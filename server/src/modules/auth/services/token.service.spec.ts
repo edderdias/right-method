@@ -25,7 +25,7 @@ describe("TokenService", () => {
     get: jest.fn((key: string) => {
       const values: Record<string, unknown> = {
         JWT_ACCESS_SECRET: "a".repeat(32),
-        JWT_ACCESS_EXPIRES_IN: "15m",
+        JWT_ACCESS_EXPIRES_IN: "1h",
         JWT_REFRESH_EXPIRES_IN_DAYS: 30,
       };
       return values[key];
@@ -40,7 +40,7 @@ describe("TokenService", () => {
   });
 
   it("exposes the configured access token TTL in seconds", () => {
-    expect(service.accessTokenExpiresInSeconds).toBe(900);
+    expect(service.accessTokenExpiresInSeconds).toBe(3600);
   });
 
   it("computes a refresh token expiry ~30 days in the future", () => {

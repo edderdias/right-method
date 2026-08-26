@@ -1,6 +1,6 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
-import { IsDateString, IsInt, IsOptional, IsUUID, Max, MaxLength, Min } from "class-validator";
+import { IsDateString, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
 
 export class ListCreditCardPurchasesQueryDto {
   @ApiPropertyOptional({ example: "2026-08-01" })
@@ -22,6 +22,12 @@ export class ListCreditCardPurchasesQueryDto {
   @IsOptional()
   @IsUUID()
   invoiceId?: string;
+
+  @ApiPropertyOptional({ description: "Filtra pelo responsável exato da compra" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  responsibleName?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
