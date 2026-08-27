@@ -11,6 +11,8 @@ import type {
   CreatePurchaseInput,
   PayInvoiceInput,
   RemovePurchaseScope,
+  ResponsibleSummary,
+  ResponsiblesSummaryFilters,
   UpdateCreditCardInput,
   UpdatePurchaseInput,
 } from "@/types/credit-card";
@@ -60,6 +62,24 @@ export async function listCreditCardPurchases(
   const { data } = await apiGet<ApiEnvelope<CreditCardPurchaseListResponse>>(
     `/credit-cards/${cardId}/purchases`,
     { ...filters },
+  );
+  return data;
+}
+
+export async function getCardResponsiblesSummary(
+  cardId: string,
+  filters: ResponsiblesSummaryFilters = {},
+): Promise<ResponsibleSummary[]> {
+  const { data } = await apiGet<ApiEnvelope<ResponsibleSummary[]>>(
+    `/credit-cards/${cardId}/responsibles-summary`,
+    { ...filters },
+  );
+  return data;
+}
+
+export async function getCardResponsibleSuggestions(cardId: string): Promise<string[]> {
+  const { data } = await apiGet<ApiEnvelope<string[]>>(
+    `/credit-cards/${cardId}/responsible-suggestions`,
   );
   return data;
 }

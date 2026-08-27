@@ -36,6 +36,12 @@ export class CreateCreditCardPurchaseDto {
   @IsUUID()
   categoryId?: string;
 
+  @ApiPropertyOptional({ example: "João", description: "Quem fez / é responsável pela compra" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  responsibleName?: string;
+
   @ApiPropertyOptional({ minimum: 2, maximum: 48, example: 12 })
   @IsOptional()
   @Type(() => Number)

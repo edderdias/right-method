@@ -7,13 +7,19 @@ import {
   GoalTransactionNotFoundException,
 } from "../../common/exceptions/app.exception";
 import { parseDateOnly } from "../../common/utils/date-only";
+import { NotificationsService } from "../notifications/notifications.service";
 import type { CreateGoalTransactionDto } from "./dto/create-goal-transaction.dto";
+
+const MILESTONES = [25, 50, 75, 100];
 
 export type PublicGoalTransaction = Omit<GoalTransaction, "amount"> & { amount: number };
 
 @Injectable()
 export class GoalTransactionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   async create(
     userId: string,
@@ -53,7 +59,42 @@ export class GoalTransactionsService {
       return transaction;
     });
 
+    await this.notifyMilestoneIfCrossed(userId, goal, currentAmount, dto.type, dto.amount);
+
     return this.toPublic(created);
+  }
+
+  /** Fires once per (goal, milestone%) crossing — a withdrawal that later gets re-deposited and
+   * re-crosses the same milestone is allowed to notify again, guarded by the entityId uniqueness
+   * on Notification rather than any state kept here. */
+  private async notifyMilestoneIfCrossed(
+    userId: string,
+    goal: FinancialGoal,
+    amountBefore: number,
+    type: GoalTransactionType,
+    amount: number,
+  ): Promise<void> {
+    const targetAmount = Number(goal.targetAmount);
+    if (targetAmount <= 0) return;
+
+    const delta = type === GoalTransactionType.DEPOSIT ? amount : -amount;
+    const amountAfter = Math.max(amountBefore + delta, 0);
+    const oldPct = (amountBefore / targetAmount) * 100;
+    const newPct = (amountAfter / targetAmount) * 100;
+    const crossed = MILESTONES.find((milestone) => oldPct < milestone && newPct >= milestone);
+    if (!crossed) return;
+
+    await this.notifications.create({
+      userId,
+      type: "GOAL_MILESTONE",
+      title: crossed >= 100 ? "Meta concluída!" : `${crossed}% da meta atingido`,
+      body:
+        crossed >= 100
+          ? `Você concluiu a meta "${goal.name}".`
+          : `Você já alcançou ${crossed}% da meta "${goal.name}".`,
+      link: "/metas",
+      entityId: `${goal.id}:${crossed}`,
+    });
   }
 
   async list(userId: string, goalId: string): Promise<PublicGoalTransaction[]> {

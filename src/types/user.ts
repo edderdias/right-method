@@ -18,6 +18,7 @@ export interface UserProfile {
   biometricEnabled: boolean;
   twoFactorEnabled: boolean;
   newDeviceAlertEnabled: boolean;
+  hideBalances: boolean;
   aiProvider: AiProvider;
   hasAiApiKey: boolean;
   hasPluggyCredentials: boolean;
@@ -36,5 +37,5 @@ export type NotificationPreferences = Pick<
 
 export type SecurityPreferences = Pick<
   UserProfile,
-  "biometricEnabled" | "twoFactorEnabled" | "newDeviceAlertEnabled"
+  "biometricEnabled" | "twoFactorEnabled" | "newDeviceAlertEnabled" | "hideBalances"
 >;

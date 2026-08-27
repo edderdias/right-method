@@ -6,6 +6,8 @@ import {
   addOpenFinanceCreditCard,
   createCreditCard,
   createCreditCardPurchase,
+  getCardResponsiblesSummary,
+  getCardResponsibleSuggestions,
   getCreditCard,
   getCreditCardInvoice,
   getCreditCardsSummary,
@@ -26,6 +28,7 @@ import type {
   CreditCardPurchaseFilters,
   PayInvoiceInput,
   RemovePurchaseScope,
+  ResponsiblesSummaryFilters,
   UpdateCreditCardInput,
   UpdatePurchaseInput,
 } from "@/types/credit-card";
@@ -39,6 +42,11 @@ export const creditCardKeys = {
   invoices: (cardId: string) => ["credit-cards", cardId, "invoices"] as const,
   invoice: (cardId: string, invoiceId: string) =>
     ["credit-cards", cardId, "invoices", invoiceId] as const,
+  responsibles: (cardId: string) => ["credit-cards", cardId, "responsibles"] as const,
+  responsiblesSummary: (cardId: string, filters: ResponsiblesSummaryFilters) =>
+    ["credit-cards", cardId, "responsibles", "summary", filters] as const,
+  responsibleSuggestions: (cardId: string) =>
+    ["credit-cards", cardId, "responsibles", "suggestions"] as const,
   availableOpenFinance: (connectionId: string) =>
     ["credit-cards", "open-finance-available", connectionId] as const,
 };
@@ -69,6 +77,22 @@ export function useCreditCardPurchases(cardId: string, filters: CreditCardPurcha
   return useQuery({
     queryKey: creditCardKeys.purchases(cardId, filters),
     queryFn: () => listCreditCardPurchases(cardId, filters),
+    enabled: Boolean(cardId),
+  });
+}
+
+export function useCardResponsiblesSummary(cardId: string, filters: ResponsiblesSummaryFilters) {
+  return useQuery({
+    queryKey: creditCardKeys.responsiblesSummary(cardId, filters),
+    queryFn: () => getCardResponsiblesSummary(cardId, filters),
+    enabled: Boolean(cardId),
+  });
+}
+
+export function useCardResponsibleSuggestions(cardId: string) {
+  return useQuery({
+    queryKey: creditCardKeys.responsibleSuggestions(cardId),
+    queryFn: () => getCardResponsibleSuggestions(cardId),
     enabled: Boolean(cardId),
   });
 }
@@ -155,6 +179,7 @@ export function useCreatePurchase() {
       void queryClient.invalidateQueries({
         queryKey: ["credit-cards", purchase.cardId, "invoices"],
       });
+      void queryClient.invalidateQueries({ queryKey: creditCardKeys.responsibles(purchase.cardId) });
       invalidateCardAndSummary(queryClient, purchase.cardId);
     },
     onError: (error) => toast.error(toErrorMessage(error)),
@@ -174,6 +199,7 @@ export function useUpdatePurchase() {
       void queryClient.invalidateQueries({
         queryKey: ["credit-cards", purchase.cardId, "invoices"],
       });
+      void queryClient.invalidateQueries({ queryKey: creditCardKeys.responsibles(purchase.cardId) });
       invalidateCardAndSummary(queryClient, purchase.cardId);
     },
     onError: (error) => toast.error(toErrorMessage(error)),
@@ -199,6 +225,9 @@ export function useDeletePurchase() {
       });
       void queryClient.invalidateQueries({
         queryKey: ["credit-cards", variables.cardId, "invoices"],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: creditCardKeys.responsibles(variables.cardId),
       });
       invalidateCardAndSummary(queryClient, variables.cardId);
     },
@@ -261,6 +290,7 @@ export function useSyncCreditCard() {
       invalidateCardAndSummary(queryClient, id);
       void queryClient.invalidateQueries({ queryKey: ["credit-cards", id, "purchases"] });
       void queryClient.invalidateQueries({ queryKey: ["credit-cards", id, "invoices"] });
+      void queryClient.invalidateQueries({ queryKey: creditCardKeys.responsibles(id) });
     },
     onError: (error) => toast.error(toErrorMessage(error)),
   });

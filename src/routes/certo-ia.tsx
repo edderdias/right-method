@@ -42,6 +42,7 @@ import {
 import {
   useAiConversation,
   useAiConversations,
+  useAiFreeTierStatus,
   useCreateAiConversation,
   useDeleteAiConversation,
   useRenameAiConversation,
@@ -133,6 +134,7 @@ function CertoIaPage() {
   const { data: reportSummary } = useReportSummary({});
   const { data: goalsSummary } = useFinancialGoalsSummary();
   const { data: investmentsSummary } = useInvestmentsSummary();
+  const { data: freeTier } = useAiFreeTierStatus();
 
   const isSending = sendMessage.isPending || createConversation.isPending;
 
@@ -413,6 +415,15 @@ function CertoIaPage() {
               </Button>
             </form>
             <p className="mt-3 text-center text-[11px] leading-relaxed text-muted-foreground">
+              {freeTier?.active && (
+                <>
+                  Modo gratuito: {freeTier.remaining} de {freeTier.limit} mensagens restantes hoje.{" "}
+                  <Link to="/configuracoes" className="underline underline-offset-2">
+                    Usar minha chave
+                  </Link>
+                  {" · "}
+                </>
+              )}
               O Certo IA fornece análises com base nos dados disponíveis no Método Certo. As
               informações não constituem recomendação financeira, contábil ou jurídica profissional.
             </p>

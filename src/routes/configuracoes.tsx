@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   Sun,
   User,
   UserPlus,
@@ -36,6 +37,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+import { PhoneInput } from "@/components/ui/phone-input";
 import {
   Select,
   SelectContent,
@@ -55,10 +58,17 @@ import {
 } from "@/hooks/use-family";
 import {
   useAiCredentialsStatus,
+  useAiFreeTierStatus,
   useRemoveAiCredentials,
   useSaveAiCredentials,
 } from "@/hooks/use-ai-chat";
 import { useTheme } from "@/hooks/use-theme";
+import {
+  useConfirmTwoFactor,
+  useDisableTwoFactor,
+  useSetupTwoFactor,
+} from "@/hooks/use-two-factor";
+import { useDisableBiometric, useEnableBiometric } from "@/hooks/use-webauthn";
 import {
   useChangePassword,
   useCurrentUser,
@@ -151,7 +161,6 @@ const temas = [
 function ConfiguracoesPage() {
   const navigate = useNavigate();
   const { theme: tema, setTheme: setTema } = useTheme();
-  const [ocultarSaldos, setOcultarSaldos] = useState(false);
 
   const { data: currentUser } = useCurrentUser();
   const updateProfileMutation = useUpdateProfile();
@@ -182,6 +191,50 @@ function ConfiguracoesPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+
+  const [twoFactorSetupOpen, setTwoFactorSetupOpen] = useState(false);
+  const [twoFactorSetupData, setTwoFactorSetupData] = useState<{
+    otpauthUrl: string;
+    qrCodeDataUrl: string;
+  } | null>(null);
+  const [twoFactorCode, setTwoFactorCode] = useState("");
+  const setupTwoFactorMutation = useSetupTwoFactor();
+  const confirmTwoFactorMutation = useConfirmTwoFactor();
+  const disableTwoFactorMutation = useDisableTwoFactor();
+  const enableBiometricMutation = useEnableBiometric();
+  const disableBiometricMutation = useDisableBiometric();
+
+  function handleToggleBiometric(checked: boolean) {
+    if (checked) {
+      enableBiometricMutation.mutate();
+    } else {
+      disableBiometricMutation.mutate();
+    }
+  }
+
+  function handleToggleTwoFactor(checked: boolean) {
+    if (!checked) {
+      disableTwoFactorMutation.mutate();
+      return;
+    }
+    setupTwoFactorMutation.mutate(undefined, {
+      onSuccess: (data) => {
+        setTwoFactorSetupData(data);
+        setTwoFactorCode("");
+        setTwoFactorSetupOpen(true);
+      },
+    });
+  }
+
+  function handleConfirmTwoFactor() {
+    confirmTwoFactorMutation.mutate(twoFactorCode, {
+      onSuccess: () => {
+        setTwoFactorSetupOpen(false);
+        setTwoFactorSetupData(null);
+        setTwoFactorCode("");
+      },
+    });
+  }
 
   function handleChangePassword() {
     if (newPassword !== confirmPassword) {
@@ -219,8 +272,10 @@ function ConfiguracoesPage() {
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showKeyForm, setShowKeyForm] = useState(false);
   const [aiProviderInput, setAiProviderInput] = useState<AiProvider>("OPENAI");
   const { data: aiCredentialsStatus } = useAiCredentialsStatus();
+  const { data: aiFreeTier } = useAiFreeTierStatus();
   const saveAiCredentialsMutation = useSaveAiCredentials();
   const removeAiCredentialsMutation = useRemoveAiCredentials();
 
@@ -338,10 +393,10 @@ function ConfiguracoesPage() {
                 <label htmlFor="telefone" className="text-sm font-medium">
                   Telefone
                 </label>
-                <input
+                <PhoneInput
                   id="telefone"
                   value={profileForm.phone}
-                  onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
+                  onChange={(phone) => setProfileForm((f) => ({ ...f, phone }))}
                   placeholder="(11) 98877-4321"
                   className="mt-2 h-11 w-full rounded-xl border border-input bg-surface px-4 text-sm outline-none focus:ring-2 focus:ring-ring/40"
                 />
@@ -423,8 +478,11 @@ function ConfiguracoesPage() {
               <div className="flex items-center justify-between">
                 <span>Ocultar saldos</span>
                 <Switch
-                  checked={ocultarSaldos}
-                  onCheckedChange={setOcultarSaldos}
+                  checked={currentUser?.hideBalances ?? false}
+                  onCheckedChange={(checked) =>
+                    securityPrefsMutation.mutate({ hideBalances: checked })
+                  }
+                  disabled={securityPrefsMutation.isPending}
                   aria-label="Ocultar saldos"
                 />
               </div>
@@ -439,83 +497,125 @@ function ConfiguracoesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Escolha o provedor de IA e cadastre sua própria chave para usar o Certo IA com a
-                sua conta.
-              </p>
               {aiCredentialsStatus?.hasKey ? (
-                <div className="flex items-center justify-between rounded-2xl bg-surface-2 p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
-                      <KeyRound className="size-4" aria-hidden="true" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {
-                          aiProviderOptions.find((o) => o.value === aiCredentialsStatus.provider)
-                            ?.label
-                        }
-                      </p>
-                      <p className="text-xs text-muted-foreground">••••••••••••••••</p>
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Você está usando a sua própria chave — sem limite de mensagens.
+                  </p>
+                  <div className="flex items-center justify-between rounded-2xl bg-surface-2 p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
+                        <KeyRound className="size-4" aria-hidden="true" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {
+                            aiProviderOptions.find((o) => o.value === aiCredentialsStatus.provider)
+                              ?.label
+                          }
+                        </p>
+                        <p className="text-xs text-muted-foreground">••••••••••••••••</p>
+                      </div>
                     </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    onClick={() => removeAiCredentialsMutation.mutate()}
-                    disabled={removeAiCredentialsMutation.isPending}
-                  >
-                    Remover
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Select
-                    value={aiProviderInput}
-                    onValueChange={(value) => setAiProviderInput(value as AiProvider)}
-                  >
-                    <SelectTrigger className="h-11 rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {aiProviderOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="relative">
-                    <Input
-                      type={showApiKey ? "text" : "password"}
-                      placeholder={
-                        aiProviderOptions.find((o) => o.value === aiProviderInput)?.placeholder
-                      }
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                      className="h-11 rounded-xl pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                      aria-label={showApiKey ? "Ocultar chave" : "Mostrar chave"}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => removeAiCredentialsMutation.mutate()}
+                      disabled={removeAiCredentialsMutation.isPending}
                     >
-                      {showApiKey ? (
-                        <EyeOff className="size-4" aria-hidden="true" />
-                      ) : (
-                        <Eye className="size-4" aria-hidden="true" />
-                      )}
-                    </button>
+                      Remover
+                    </Button>
                   </div>
-                  <Button
-                    className="w-full rounded-xl bg-gradient-brand font-semibold"
-                    onClick={handleSaveApiKey}
-                    disabled={!apiKeyInput.trim() || saveAiCredentialsMutation.isPending}
-                  >
-                    Salvar chave
-                  </Button>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  {aiFreeTier?.active && (
+                    <div className="flex items-start gap-3 rounded-2xl bg-surface-2 p-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
+                        <Sparkles className="size-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Modo gratuito ativo</p>
+                        <p className="text-xs text-muted-foreground">
+                          Gemini (Google) · {aiFreeTier.remaining} de {aiFreeTier.limit} mensagens
+                          restantes hoje
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {showKeyForm || !aiFreeTier?.active ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Cadastre a chave do provedor da sua escolha para uso ilimitado, com a sua
+                        própria conta.
+                      </p>
+                      <Select
+                        value={aiProviderInput}
+                        onValueChange={(value) => setAiProviderInput(value as AiProvider)}
+                      >
+                        <SelectTrigger className="h-11 rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {aiProviderOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="relative">
+                        <Input
+                          type={showApiKey ? "text" : "password"}
+                          placeholder={
+                            aiProviderOptions.find((o) => o.value === aiProviderInput)?.placeholder
+                          }
+                          value={apiKeyInput}
+                          onChange={(e) => setApiKeyInput(e.target.value)}
+                          className="h-11 rounded-xl pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          aria-label={showApiKey ? "Ocultar chave" : "Mostrar chave"}
+                        >
+                          {showApiKey ? (
+                            <EyeOff className="size-4" aria-hidden="true" />
+                          ) : (
+                            <Eye className="size-4" aria-hidden="true" />
+                          )}
+                        </button>
+                      </div>
+                      <Button
+                        className="w-full rounded-xl bg-gradient-brand font-semibold"
+                        onClick={handleSaveApiKey}
+                        disabled={!apiKeyInput.trim() || saveAiCredentialsMutation.isPending}
+                      >
+                        Salvar chave
+                      </Button>
+                      {aiFreeTier?.active && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setShowKeyForm(false)}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      className="w-full rounded-xl"
+                      onClick={() => setShowKeyForm(true)}
+                    >
+                      Usar minha própria chave
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>
@@ -657,8 +757,20 @@ function ConfiguracoesPage() {
                 </div>
                 <Switch
                   checked={currentUser?.[s.id] ?? false}
-                  onCheckedChange={(checked) => securityPrefsMutation.mutate({ [s.id]: checked })}
-                  disabled={securityPrefsMutation.isPending}
+                  onCheckedChange={
+                    s.id === "twoFactorEnabled"
+                      ? handleToggleTwoFactor
+                      : s.id === "biometricEnabled"
+                        ? handleToggleBiometric
+                        : (checked) => securityPrefsMutation.mutate({ [s.id]: checked })
+                  }
+                  disabled={
+                    s.id === "twoFactorEnabled"
+                      ? setupTwoFactorMutation.isPending || disableTwoFactorMutation.isPending
+                      : s.id === "biometricEnabled"
+                        ? enableBiometricMutation.isPending || disableBiometricMutation.isPending
+                        : securityPrefsMutation.isPending
+                  }
                   aria-label={s.label}
                 />
               </div>
@@ -917,6 +1029,54 @@ function ConfiguracoesPage() {
               }
             >
               Salvar nova senha
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={twoFactorSetupOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTwoFactorSetupOpen(false);
+            setTwoFactorSetupData(null);
+            setTwoFactorCode("");
+          }
+        }}
+      >
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ativar autenticação em dois fatores</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Escaneie o QR code com seu app autenticador (Google Authenticator, Authy, etc.) e
+              digite o código gerado para confirmar.
+            </p>
+            {twoFactorSetupData && (
+              <img
+                src={twoFactorSetupData.qrCodeDataUrl}
+                alt="QR code para configurar autenticação em dois fatores"
+                className="mx-auto size-48 rounded-2xl border border-border/70"
+              />
+            )}
+            <div className="flex justify-center">
+              <InputOTP maxLength={6} value={twoFactorCode} onChange={setTwoFactorCode}>
+                <InputOTPGroup>
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <InputOTPSlot key={index} index={index} />
+                  ))}
+                </InputOTPGroup>
+              </InputOTP>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              className="w-full rounded-xl bg-gradient-brand font-semibold"
+              onClick={handleConfirmTwoFactor}
+              disabled={confirmTwoFactorMutation.isPending || twoFactorCode.length !== 6}
+            >
+              Confirmar e ativar
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -18,6 +18,14 @@ import type { RemovePurchaseScope } from "./dto/remove-purchase-query.dto";
 
 const PURCHASE_INCLUDE = { category: true } as const;
 
+/** Trims the free-text responsible name; empty/blank becomes null so "no responsible" is a single
+ * consistent value in the DB and in the per-responsible breakdown. */
+function normalizeResponsibleName(value: string | null | undefined): string | null {
+  if (value === null || value === undefined) return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
+
 type PurchaseWithRelations = Prisma.CreditCardPurchaseGetPayload<{
   include: typeof PURCHASE_INCLUDE;
 }>;
@@ -29,6 +37,19 @@ export interface PurchaseListResult {
   total: number;
   page: number;
   pageSize: number;
+}
+
+export interface ResponsibleSummaryItem {
+  responsibleName: string | null;
+  total: number;
+  count: number;
+}
+
+export interface ResponsiblesSummaryFilters {
+  from?: string;
+  to?: string;
+  categoryId?: string;
+  invoiceId?: string;
 }
 
 @Injectable()
@@ -75,6 +96,7 @@ export class CreditCardPurchasesService {
           amount: dto.amount,
           purchaseDate,
           categoryId: dto.categoryId,
+          responsibleName: normalizeResponsibleName(dto.responsibleName),
           notes: dto.notes,
           source: CardPurchaseSource.MANUAL,
         },
@@ -103,6 +125,7 @@ export class CreditCardPurchasesService {
     }
     if (query.categoryId) where.categoryId = query.categoryId;
     if (query.invoiceId) where.invoiceId = query.invoiceId;
+    if (query.responsibleName) where.responsibleName = query.responsibleName;
     if (query.search) {
       where.OR = [
         { description: { contains: query.search, mode: "insensitive" } },
@@ -131,6 +154,54 @@ export class CreditCardPurchasesService {
     return this.toPublic(await this.findOwnedOrThrow(userId, id));
   }
 
+  /** Total spend per responsible for a card, over the same filters the extrato uses. Purchases
+   * with no responsible are grouped under a single `null` entry. Sorted by total, descending. */
+  async responsiblesSummary(
+    userId: string,
+    cardId: string,
+    filters: ResponsiblesSummaryFilters,
+  ): Promise<ResponsibleSummaryItem[]> {
+    const where: Prisma.CreditCardPurchaseWhereInput = { userId, cardId };
+
+    if (filters.from || filters.to) {
+      where.purchaseDate = {
+        ...(filters.from ? { gte: parseDateOnly(filters.from) } : {}),
+        ...(filters.to ? { lte: parseDateOnly(filters.to) } : {}),
+      };
+    }
+    if (filters.categoryId) where.categoryId = filters.categoryId;
+    if (filters.invoiceId) where.invoiceId = filters.invoiceId;
+
+    const grouped = await this.prisma.creditCardPurchase.groupBy({
+      by: ["responsibleName"],
+      where,
+      _sum: { amount: true },
+      _count: { _all: true },
+    });
+
+    return grouped
+      .map((row) => ({
+        responsibleName: row.responsibleName,
+        total: Number(row._sum.amount ?? 0),
+        count: row._count._all,
+      }))
+      .sort((a, b) => b.total - a.total);
+  }
+
+  /** Distinct responsible names already used on this card — feeds the autocomplete in the
+   * purchase form (merged client-side with the user's own name and family members). */
+  async listResponsibleSuggestions(userId: string, cardId: string): Promise<string[]> {
+    const rows = await this.prisma.creditCardPurchase.findMany({
+      where: { userId, cardId, responsibleName: { not: null } },
+      distinct: ["responsibleName"],
+      select: { responsibleName: true },
+      orderBy: { responsibleName: "asc" },
+    });
+    return rows
+      .map((row) => row.responsibleName)
+      .filter((name): name is string => name !== null);
+  }
+
   async update(
     userId: string,
     id: string,
@@ -154,6 +225,9 @@ export class CreditCardPurchasesService {
     const data: Prisma.CreditCardPurchaseUncheckedUpdateInput = {};
     if (dto.description !== undefined) data.description = dto.description;
     if (dto.categoryId !== undefined) data.categoryId = dto.categoryId;
+    if (dto.responsibleName !== undefined) {
+      data.responsibleName = normalizeResponsibleName(dto.responsibleName);
+    }
     if (dto.notes !== undefined) data.notes = dto.notes;
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -248,6 +322,7 @@ export class CreditCardPurchasesService {
             amount: cents / 100,
             purchaseDate: installmentDate,
             categoryId: dto.categoryId,
+            responsibleName: normalizeResponsibleName(dto.responsibleName),
             notes: dto.notes,
             source: CardPurchaseSource.MANUAL,
             installmentGroupId,

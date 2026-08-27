@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -34,7 +34,13 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useExpenseCategories } from "@/hooks/use-expenses";
-import { useCreatePurchase, useUpdatePurchase } from "@/hooks/use-credit-cards";
+import {
+  useCardResponsibleSuggestions,
+  useCreatePurchase,
+  useUpdatePurchase,
+} from "@/hooks/use-credit-cards";
+import { useFamilyAccess, useFamilyMembers } from "@/hooks/use-family";
+import { useCurrentUser } from "@/hooks/use-user-settings";
 import { parseISODateToLocalDate, toISODateString } from "@/lib/finance-format";
 import type { CreditCardPurchase } from "@/types/credit-card";
 
@@ -46,6 +52,7 @@ const purchaseFormSchema = z
       .positive("Informe um valor maior que zero."),
     purchaseDate: z.date({ required_error: "Selecione a data da compra." }),
     categoryId: z.string().optional(),
+    responsibleName: z.string().max(80, "Máximo de 80 caracteres.").optional(),
     notes: z.string().max(500).optional(),
     isInstallment: z.boolean(),
     totalInstallments: z.number().int().min(2).max(48).optional(),
@@ -64,6 +71,7 @@ function toFormDefaults(purchase: CreditCardPurchase | null): PurchaseFormValues
       amount: undefined as unknown as number,
       purchaseDate: new Date(),
       categoryId: undefined,
+      responsibleName: "",
       notes: "",
       isInstallment: false,
       totalInstallments: undefined,
@@ -74,6 +82,7 @@ function toFormDefaults(purchase: CreditCardPurchase | null): PurchaseFormValues
     amount: purchase.amount,
     purchaseDate: parseISODateToLocalDate(purchase.purchaseDate),
     categoryId: purchase.categoryId ?? undefined,
+    responsibleName: purchase.responsibleName ?? "",
     notes: purchase.notes ?? "",
     isInstallment: false,
     totalInstallments: undefined,
@@ -96,9 +105,27 @@ export function PurchaseFormDialog({
   const categoriesQuery = useExpenseCategories();
   const createPurchase = useCreatePurchase();
   const updatePurchase = useUpdatePurchase();
+  const responsibleSuggestions = useCardResponsibleSuggestions(cardId);
+  const currentUser = useCurrentUser();
+  const familyMembers = useFamilyMembers();
+  const familyAccess = useFamilyAccess();
   const isEditing = Boolean(purchase);
   const isReadOnly = purchase?.source === "OPEN_FINANCE";
   const submitting = createPurchase.isPending || updatePurchase.isPending;
+
+  const responsibleListId = `responsible-options-${cardId}`;
+  const responsibleOptions = useMemo(() => {
+    const names = new Set<string>();
+    if (currentUser.data?.name) names.add(currentUser.data.name);
+    for (const grant of familyMembers.data ?? []) {
+      if (grant.member?.name) names.add(grant.member.name);
+    }
+    for (const grant of familyAccess.data ?? []) {
+      if (grant.owner?.name) names.add(grant.owner.name);
+    }
+    for (const name of responsibleSuggestions.data ?? []) names.add(name);
+    return [...names].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  }, [currentUser.data, familyMembers.data, familyAccess.data, responsibleSuggestions.data]);
 
   const form = useForm<PurchaseFormValues>({
     resolver: zodResolver(purchaseFormSchema),
@@ -114,17 +141,23 @@ export function PurchaseFormDialog({
 
   function handleSubmit(values: PurchaseFormValues) {
     const notes = values.notes ? { notes: values.notes } : {};
+    const trimmedResponsible = values.responsibleName?.trim() ?? "";
 
     if (purchase) {
       updatePurchase.mutate(
         {
           id: purchase.id,
           input: isReadOnly
-            ? { categoryId: values.categoryId ?? null, ...notes }
+            ? {
+                categoryId: values.categoryId ?? null,
+                responsibleName: trimmedResponsible || null,
+                ...notes,
+              }
             : {
                 description: values.description,
                 purchaseDate: toISODateString(values.purchaseDate),
                 categoryId: values.categoryId ?? null,
+                responsibleName: trimmedResponsible || null,
                 ...notes,
               },
         },
@@ -141,6 +174,7 @@ export function PurchaseFormDialog({
           amount: values.amount,
           purchaseDate: toISODateString(values.purchaseDate),
           ...(values.categoryId ? { categoryId: values.categoryId } : {}),
+          ...(trimmedResponsible ? { responsibleName: trimmedResponsible } : {}),
           ...notes,
           ...(values.isInstallment && values.totalInstallments
             ? { totalInstallments: values.totalInstallments }
@@ -242,6 +276,31 @@ export function PurchaseFormDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="responsibleName"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Responsável pela compra</FormLabel>
+                  <FormControl>
+                    <Input
+                      list={responsibleListId}
+                      placeholder="Quem fez a compra? (opcional)"
+                      autoComplete="off"
+                      {...field}
+                      value={field.value ?? ""}
+                    />
+                  </FormControl>
+                  <datalist id={responsibleListId}>
+                    {responsibleOptions.map((name) => (
+                      <option key={name} value={name} />
+                    ))}
+                  </datalist>
                   <FormMessage />
                 </FormItem>
               )}

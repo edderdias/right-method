@@ -44,6 +44,7 @@ export interface CreditCardPurchase {
   purchaseDate: string;
   categoryId: string | null;
   category: Category | null;
+  responsibleName: string | null;
   source: CardPurchaseSource;
   installmentGroupId: string | null;
   installmentNumber: number | null;
@@ -65,9 +66,23 @@ export interface CreditCardPurchaseFilters {
   to?: string;
   categoryId?: string;
   invoiceId?: string;
+  responsibleName?: string;
   search?: string;
   page?: number;
   pageSize?: number;
+}
+
+export interface ResponsibleSummary {
+  responsibleName: string | null;
+  total: number;
+  count: number;
+}
+
+export interface ResponsiblesSummaryFilters {
+  from?: string;
+  to?: string;
+  categoryId?: string;
+  invoiceId?: string;
 }
 
 export interface CreditCardInvoice {
@@ -105,6 +120,7 @@ export interface CreatePurchaseInput {
   amount: number;
   purchaseDate: string;
   categoryId?: string;
+  responsibleName?: string;
   totalInstallments?: number;
   notes?: string;
 }
@@ -113,6 +129,7 @@ export interface UpdatePurchaseInput {
   description?: string;
   purchaseDate?: string;
   categoryId?: string | null;
+  responsibleName?: string | null;
   notes?: string;
 }
 

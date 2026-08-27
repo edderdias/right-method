@@ -30,6 +30,18 @@ export class SessionsService {
     });
   }
 
+  /** Used to distinguish a genuinely new device from a returning one before sending the
+   * "new device" login alert — a device you've logged into before, even from an expired
+   * session, still counts as known, so this only checks userAgent, not expiresAt. */
+  async hasSessionWithUserAgent(userId: string, userAgent: string | undefined): Promise<boolean> {
+    if (!userAgent) return false;
+    const existing = await this.prisma.userSession.findFirst({
+      where: { userId, userAgent, revokedAt: null },
+      select: { id: true },
+    });
+    return existing !== null;
+  }
+
   findValidByHash(refreshTokenHash: string): Promise<UserSession | null> {
     return this.prisma.userSession.findFirst({
       where: {

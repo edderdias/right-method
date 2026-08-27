@@ -20,6 +20,7 @@ import { CreateCreditCardDto } from "./dto/create-credit-card.dto";
 import { UpdateCreditCardDto } from "./dto/update-credit-card.dto";
 import { CreateCreditCardPurchaseDto } from "./dto/create-credit-card-purchase.dto";
 import { ListCreditCardPurchasesQueryDto } from "./dto/list-credit-card-purchases-query.dto";
+import { ResponsiblesSummaryQueryDto } from "./dto/responsibles-summary-query.dto";
 import { PayInvoiceDto } from "./dto/pay-invoice.dto";
 
 @ApiTags("credit-cards")
@@ -105,6 +106,26 @@ export class CreditCardsController {
     const card = await this.creditCardsService.assertOwnedActiveCard(user.sub, id);
     const data = await this.purchasesService.create(user.sub, card, dto);
     return { message: "Compra cadastrada com sucesso.", data };
+  }
+
+  @Get(":id/responsibles-summary")
+  @ApiOperation({ summary: "Total gasto por responsável no cartão (mesmos filtros do extrato)" })
+  async responsiblesSummary(
+    @CurrentUser() user: JwtPayload,
+    @Param("id") id: string,
+    @Query() query: ResponsiblesSummaryQueryDto,
+  ) {
+    await this.creditCardsService.assertOwnership(user.sub, id);
+    const data = await this.purchasesService.responsiblesSummary(user.sub, id, query);
+    return { message: "Gastos por responsável.", data };
+  }
+
+  @Get(":id/responsible-suggestions")
+  @ApiOperation({ summary: "Nomes de responsáveis já usados neste cartão (autocomplete)" })
+  async responsibleSuggestions(@CurrentUser() user: JwtPayload, @Param("id") id: string) {
+    await this.creditCardsService.assertOwnership(user.sub, id);
+    const data = await this.purchasesService.listResponsibleSuggestions(user.sub, id);
+    return { message: "Sugestões de responsável.", data };
   }
 
   @Get(":id/invoices")

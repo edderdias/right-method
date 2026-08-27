@@ -28,6 +28,8 @@ import { ResetPasswordDto } from "../dto/reset-password.dto";
 import { ChangePasswordDto } from "../dto/change-password.dto";
 import { VerifyEmailDto } from "../dto/verify-email.dto";
 import { ResendVerificationDto } from "../dto/resend-verification.dto";
+import { VerifyTwoFactorDto } from "../dto/verify-two-factor.dto";
+import { VerifyWebAuthnLoginDto } from "../dto/verify-webauthn-login.dto";
 
 const GENERIC_OK = {
   message: "Se os dados informados forem válidos, você receberá as instruções por e-mail.",
@@ -57,6 +59,44 @@ export class AuthController {
   @ApiOperation({ summary: "Autentica um usuário" })
   async login(@Body() dto: LoginDto, @Req() req: Request) {
     const data = await this.authService.login(dto, getRequestMetadata(req));
+    return { message: "Login realizado com sucesso.", data };
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post("2fa/verify")
+  @ApiOperation({ summary: "Confirma o código de 2FA e conclui o login" })
+  async verifyTwoFactor(@Body() dto: VerifyTwoFactorDto, @Req() req: Request) {
+    const data = await this.authService.verifyTwoFactor(
+      dto.challengeToken,
+      dto.code,
+      getRequestMetadata(req),
+    );
+    return { message: "Login realizado com sucesso.", data };
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post("webauthn/login-options")
+  @ApiOperation({ summary: "Gera o desafio de login por biometria (passkey descobrível)" })
+  async webAuthnLoginOptions() {
+    const data = await this.authService.webAuthnLoginOptions();
+    return { message: "Opções de login geradas.", data };
+  }
+
+  @Public()
+  @Throttle({ default: { limit: 5, ttl: 15 * 60_000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post("webauthn/login-verify")
+  @ApiOperation({ summary: "Confirma o login por biometria" })
+  async webAuthnLoginVerify(@Body() dto: VerifyWebAuthnLoginDto, @Req() req: Request) {
+    const data = await this.authService.completeWebAuthnLogin(
+      dto.ceremonyId,
+      dto.response,
+      getRequestMetadata(req),
+    );
     return { message: "Login realizado com sucesso.", data };
   }
 

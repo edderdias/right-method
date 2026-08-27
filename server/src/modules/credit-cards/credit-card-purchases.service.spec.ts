@@ -17,6 +17,7 @@ function createPrismaMock() {
       update: jest.fn(),
       deleteMany: jest.fn(),
       aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     creditCardInvoice: {
       upsert: jest.fn(),
@@ -114,6 +115,83 @@ describe("CreditCardPurchasesService", () => {
       expect(prisma.creditCardInvoice.update).toHaveBeenCalledWith(
         expect.objectContaining({ where: { id: "inv-2026-08" } }),
       );
+    });
+  });
+
+  describe("create — responsible name", () => {
+    it("persists a trimmed responsibleName and blanks become null", async () => {
+      prisma.creditCardPurchase.create.mockImplementation(({ data }: any) =>
+        Promise.resolve(buildPurchase({ ...data })),
+      );
+
+      await service.create("user-1", buildCard(), {
+        description: "Mercado",
+        amount: 100,
+        purchaseDate: "2026-08-05",
+        responsibleName: "  João  ",
+      } as any);
+      expect(prisma.creditCardPurchase.create.mock.calls[0][0].data.responsibleName).toBe("João");
+
+      prisma.creditCardPurchase.create.mockClear();
+      await service.create("user-1", buildCard(), {
+        description: "Mercado",
+        amount: 100,
+        purchaseDate: "2026-08-05",
+        responsibleName: "   ",
+      } as any);
+      expect(prisma.creditCardPurchase.create.mock.calls[0][0].data.responsibleName).toBeNull();
+    });
+
+    it("repeats the same responsibleName across every installment", async () => {
+      prisma.creditCardPurchase.create.mockImplementation(({ data }: any) =>
+        Promise.resolve(buildPurchase({ ...data, id: `p-${data.installmentNumber}` })),
+      );
+
+      await service.create("user-1", buildCard(), {
+        description: "Notebook",
+        amount: 900,
+        purchaseDate: "2026-08-05",
+        totalInstallments: 3,
+        responsibleName: "Maria",
+      } as any);
+
+      const names = prisma.creditCardPurchase.create.mock.calls.map(
+        (call: any) => call[0].data.responsibleName,
+      );
+      expect(names).toEqual(["Maria", "Maria", "Maria"]);
+    });
+  });
+
+  describe("list — responsibleName filter", () => {
+    it("filters by the exact responsible name when provided", async () => {
+      prisma.creditCardPurchase.findMany.mockResolvedValue([]);
+      prisma.creditCardPurchase.count.mockResolvedValue(0);
+
+      await service.list("user-1", "card-1", { responsibleName: "João" } as any);
+
+      expect(prisma.creditCardPurchase.findMany.mock.calls[0][0].where.responsibleName).toBe("João");
+    });
+  });
+
+  describe("responsiblesSummary", () => {
+    it("maps groupBy rows to totals and sorts by total descending", async () => {
+      prisma.creditCardPurchase.groupBy.mockResolvedValue([
+        { responsibleName: "João", _sum: { amount: new Prisma.Decimal(120) }, _count: { _all: 2 } },
+        { responsibleName: null, _sum: { amount: new Prisma.Decimal(300) }, _count: { _all: 1 } },
+      ]);
+
+      const result = await service.responsiblesSummary("user-1", "card-1", {
+        from: "2026-08-01",
+        to: "2026-08-31",
+      });
+
+      expect(result).toEqual([
+        { responsibleName: null, total: 300, count: 1 },
+        { responsibleName: "João", total: 120, count: 2 },
+      ]);
+      const where = prisma.creditCardPurchase.groupBy.mock.calls[0][0].where;
+      expect(where).toMatchObject({ userId: "user-1", cardId: "card-1" });
+      expect(where.purchaseDate).toBeDefined();
     });
   });
 

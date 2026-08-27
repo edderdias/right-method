@@ -2,6 +2,12 @@ import { Injectable } from "@nestjs/common";
 import { AuditEvent, UserStatus, VerificationTokenType, type UserRole } from "@prisma/client";
 import { AppConfigService } from "../../../config/app-config.service";
 import { UsersService, type PublicUser } from "../../users/users.service";
+import { TwoFactorService } from "../../users/two-factor.service";
+import { WebAuthnService } from "../../users/webauthn.service";
+import type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/server";
 import { SessionsService } from "../../sessions/sessions.service";
 import { EmailService } from "../../email/email.service";
 import { AuditLogService } from "../../audit/audit-log.service";
@@ -15,18 +21,24 @@ import {
   EmailNotVerifiedException,
   InvalidCredentialsException,
   InvalidTokenException,
+  TwoFactorChallengeInvalidException,
+  TwoFactorCodeInvalidException,
 } from "../../../common/exceptions/app.exception";
 import { PasswordService } from "./password.service";
 import { TokenService } from "./token.service";
 import { VerificationTokenService } from "./verification-token.service";
+import { TwoFactorChallengeService } from "./two-factor-challenge.service";
 import type { RegisterDto } from "../dto/register.dto";
 import type { LoginDto } from "../dto/login.dto";
-import type { AuthResponse } from "../types/auth-response.type";
+import type { AuthResponse, LoginResult } from "../types/auth-response.type";
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly usersService: UsersService,
+    private readonly twoFactorService: TwoFactorService,
+    private readonly twoFactorChallengeService: TwoFactorChallengeService,
+    private readonly webAuthnService: WebAuthnService,
     private readonly sessionsService: SessionsService,
     private readonly passwordService: PasswordService,
     private readonly tokenService: TokenService,
@@ -71,7 +83,7 @@ export class AuthService {
     };
   }
 
-  async login(dto: LoginDto, metadata: RequestMetadata): Promise<AuthResponse> {
+  async login(dto: LoginDto, metadata: RequestMetadata): Promise<LoginResult> {
     await this.loginLockoutService.assertNotLocked(dto.email, metadata.ipAddress);
 
     const user = await this.usersService.findByEmail(dto.email);
@@ -108,14 +120,77 @@ export class AuthService {
     await this.auditLogService.record(AuditEvent.LOGIN_SUCCESS, metadata, user.id);
 
     if (user.newDeviceAlertEnabled) {
-      void this.emailService.sendNewLoginAlert(
-        user.email,
-        user.name,
-        metadata.ipAddress,
+      const isKnownDevice = await this.sessionsService.hasSessionWithUserAgent(
+        user.id,
         metadata.userAgent,
       );
+      if (!isKnownDevice) {
+        void this.emailService.sendNewLoginAlert(
+          user.email,
+          user.name,
+          metadata.ipAddress,
+          metadata.userAgent,
+        );
+      }
     }
 
+    if (user.twoFactorEnabled) {
+      const challengeToken = await this.twoFactorChallengeService.create(user.id);
+      return { requires2FA: true, challengeToken };
+    }
+
+    const tokens = await this.issueTokens(user.id, user.email, user.role, metadata);
+    return { ...tokens, user: this.usersService.toPublic(user) };
+  }
+
+  async verifyTwoFactor(
+    challengeToken: string,
+    code: string,
+    metadata: RequestMetadata,
+  ): Promise<AuthResponse> {
+    const userId = await this.twoFactorChallengeService.resolve(challengeToken);
+    if (!userId) {
+      throw new TwoFactorChallengeInvalidException();
+    }
+
+    const user = await this.usersService.findById(userId);
+    const secret = user ? await this.usersService.getTwoFactorSecret(userId) : null;
+    if (!user || !secret) {
+      await this.twoFactorChallengeService.consume(challengeToken);
+      throw new TwoFactorChallengeInvalidException();
+    }
+
+    const valid = await this.twoFactorService.verifyCode(secret, code);
+    if (!valid) {
+      throw new TwoFactorCodeInvalidException();
+    }
+
+    await this.twoFactorChallengeService.consume(challengeToken);
+    await this.auditLogService.record(AuditEvent.LOGIN_SUCCESS, metadata, user.id);
+
+    const tokens = await this.issueTokens(user.id, user.email, user.role, metadata);
+    return { ...tokens, user: this.usersService.toPublic(user) };
+  }
+
+  webAuthnLoginOptions(): Promise<{
+    options: PublicKeyCredentialRequestOptionsJSON;
+    ceremonyId: string;
+  }> {
+    return this.webAuthnService.generateLoginOptions();
+  }
+
+  async completeWebAuthnLogin(
+    ceremonyId: string,
+    response: AuthenticationResponseJSON,
+    metadata: RequestMetadata,
+  ): Promise<AuthResponse> {
+    const userId = await this.webAuthnService.verifyLogin(ceremonyId, response);
+    const user = await this.usersService.findById(userId);
+    if (!user || user.status !== UserStatus.ACTIVE) {
+      throw new InvalidCredentialsException();
+    }
+
+    await this.auditLogService.record(AuditEvent.LOGIN_SUCCESS, metadata, user.id);
     const tokens = await this.issueTokens(user.id, user.email, user.role, metadata);
     return { ...tokens, user: this.usersService.toPublic(user) };
   }

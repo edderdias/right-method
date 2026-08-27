@@ -27,6 +27,7 @@ export type PublicUser = Pick<
   | "biometricEnabled"
   | "twoFactorEnabled"
   | "newDeviceAlertEnabled"
+  | "hideBalances"
   | "aiProvider"
 > & { hasAiApiKey: boolean; hasPluggyCredentials: boolean };
 
@@ -124,6 +125,7 @@ export class UsersService {
       biometricEnabled: user.biometricEnabled,
       twoFactorEnabled: user.twoFactorEnabled,
       newDeviceAlertEnabled: user.newDeviceAlertEnabled,
+      hideBalances: user.hideBalances,
       aiProvider: user.aiProvider,
       hasAiApiKey: Boolean(user.aiApiKeyEncrypted),
       hasPluggyCredentials: Boolean(user.pluggyClientId && user.pluggyClientSecretEncrypted),
@@ -189,5 +191,78 @@ export class UsersService {
         this.config.get("JWT_ACCESS_SECRET"),
       ),
     };
+  }
+
+  /** Stores the secret unconfirmed — twoFactorEnabled only flips true in confirmTwoFactor(),
+   * once the user proves they actually set up the authenticator app correctly. */
+  async setPendingTwoFactorSecret(userId: string, secret: string): Promise<void> {
+    const encrypted = encryptSecret(secret, this.config.get("JWT_ACCESS_SECRET"));
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorSecretEncrypted: encrypted },
+    });
+  }
+
+  async confirmTwoFactor(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: true },
+    });
+  }
+
+  async disableTwoFactor(userId: string): Promise<void> {
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { twoFactorEnabled: false, twoFactorSecretEncrypted: null },
+    });
+  }
+
+  async getTwoFactorSecret(userId: string): Promise<string | null> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { twoFactorSecretEncrypted: true },
+    });
+    if (!user?.twoFactorSecretEncrypted) return null;
+    return decryptSecret(user.twoFactorSecretEncrypted, this.config.get("JWT_ACCESS_SECRET"));
+  }
+
+  listWebAuthnCredentials(userId: string) {
+    return this.prisma.webAuthnCredential.findMany({ where: { userId } });
+  }
+
+  findWebAuthnCredentialByCredentialId(credentialId: string) {
+    return this.prisma.webAuthnCredential.findUnique({ where: { credentialId } });
+  }
+
+  async addWebAuthnCredential(
+    userId: string,
+    credential: { credentialId: string; publicKey: Buffer; counter: number; transports: string[] },
+  ): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.webAuthnCredential.create({
+        data: {
+          userId,
+          credentialId: credential.credentialId,
+          publicKey: credential.publicKey,
+          counter: credential.counter,
+          transports: credential.transports,
+        },
+      }),
+      this.prisma.user.update({ where: { id: userId }, data: { biometricEnabled: true } }),
+    ]);
+  }
+
+  async updateWebAuthnCredentialCounter(credentialId: string, counter: number): Promise<void> {
+    await this.prisma.webAuthnCredential.update({
+      where: { credentialId },
+      data: { counter, lastUsedAt: new Date() },
+    });
+  }
+
+  async removeAllWebAuthnCredentials(userId: string): Promise<void> {
+    await this.prisma.$transaction([
+      this.prisma.webAuthnCredential.deleteMany({ where: { userId } }),
+      this.prisma.user.update({ where: { id: userId }, data: { biometricEnabled: false } }),
+    ]);
   }
 }

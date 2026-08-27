@@ -9,3 +9,10 @@ export interface AuthTokens {
 export interface AuthResponse extends AuthTokens {
   user: PublicUser;
 }
+
+export interface TwoFactorRequiredResponse {
+  requires2FA: true;
+  challengeToken: string;
+}
+
+export type LoginResult = AuthResponse | TwoFactorRequiredResponse;

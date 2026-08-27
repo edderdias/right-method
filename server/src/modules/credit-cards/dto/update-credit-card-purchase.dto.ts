@@ -24,6 +24,12 @@ export class UpdateCreditCardPurchaseDto {
   @IsUUID()
   categoryId?: string | null;
 
+  @ApiPropertyOptional({ nullable: true, description: "Responsável pela compra (null limpa)" })
+  @IsOptional()
+  @IsString()
+  @MaxLength(80)
+  responsibleName?: string | null;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()

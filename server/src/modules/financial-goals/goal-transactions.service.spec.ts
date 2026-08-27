@@ -43,11 +43,13 @@ function buildGoal(overrides: Record<string, unknown> = {}) {
 
 describe("GoalTransactionsService", () => {
   let prisma: any;
+  let notifications: any;
   let service: GoalTransactionsService;
 
   beforeEach(() => {
     prisma = createPrismaMock();
-    service = new GoalTransactionsService(prisma);
+    notifications = { create: jest.fn() };
+    service = new GoalTransactionsService(prisma, notifications);
   });
 
   describe("create", () => {

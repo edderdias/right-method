@@ -16,4 +16,9 @@ export class UpdateSecurityPreferencesDto {
   @IsOptional()
   @IsBoolean()
   newDeviceAlertEnabled?: boolean;
+
+  @ApiPropertyOptional({ description: "Ocultar saldos e totais nas telas de resumo" })
+  @IsOptional()
+  @IsBoolean()
+  hideBalances?: boolean;
 }

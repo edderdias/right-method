@@ -3,13 +3,17 @@ import { Investment, InvestmentIncome } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { InvestmentIncomeNotFoundException } from "../../common/exceptions/app.exception";
 import { parseDateOnly } from "../../common/utils/date-only";
+import { NotificationsService } from "../notifications/notifications.service";
 import type { CreateInvestmentIncomeDto } from "./dto/create-investment-income.dto";
 
 export type PublicInvestmentIncome = Omit<InvestmentIncome, "amount"> & { amount: number };
 
 @Injectable()
 export class InvestmentIncomesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
+  ) {}
 
   /** Pure record-keeping — rendimentos are cash received and never touch quantity/investedAmount,
    * which are reserved for capital movements (see InvestmentTransactionsService). */
@@ -28,6 +32,16 @@ export class InvestmentIncomesService {
         notes: dto.notes,
       },
     });
+
+    await this.notifications.create({
+      userId,
+      type: "INVESTMENT_INCOME",
+      title: "Rendimento recebido",
+      body: `${investment.name} — ${dto.amount.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} recebidos.`,
+      link: "/investimentos",
+      entityId: income.id,
+    });
+
     return this.toPublic(income);
   }
 

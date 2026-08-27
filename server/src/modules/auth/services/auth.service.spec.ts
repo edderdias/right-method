@@ -7,6 +7,8 @@ import {
   InvalidCredentialsException,
   InvalidTokenException,
   TooManyAttemptsException,
+  TwoFactorChallengeInvalidException,
+  TwoFactorCodeInvalidException,
 } from "../../../common/exceptions/app.exception";
 import { AuthService } from "./auth.service";
 
@@ -30,6 +32,9 @@ function buildUser(overrides: Partial<User> = {}): User {
 
 describe("AuthService", () => {
   let usersService: any;
+  let twoFactorService: any;
+  let twoFactorChallengeService: any;
+  let webAuthnService: any;
   let sessionsService: any;
   let passwordService: any;
   let tokenService: any;
@@ -44,6 +49,7 @@ describe("AuthService", () => {
     usersService = {
       findByEmail: jest.fn(),
       findById: jest.fn(),
+      getTwoFactorSecret: jest.fn(),
       create: jest.fn(),
       markEmailVerified: jest.fn(),
       updatePassword: jest.fn(),
@@ -63,13 +69,14 @@ describe("AuthService", () => {
       findValidByHash: jest.fn(),
       revoke: jest.fn(),
       revokeAllForUser: jest.fn(),
+      hasSessionWithUserAgent: jest.fn(async () => false),
     };
     passwordService = { hash: jest.fn(async (p: string) => `hashed:${p}`), verify: jest.fn() };
     tokenService = {
       hash: jest.fn((t: string) => `hash:${t}`),
       signAccessToken: jest.fn(() => "access-token"),
       generateOpaqueToken: jest.fn(() => ({ token: "refresh-token", hash: "hash:refresh-token" })),
-      accessTokenExpiresInSeconds: 900,
+      accessTokenExpiresInSeconds: 3600,
       refreshTokenExpiresAt: new Date(Date.now() + 1000),
     };
     verificationTokenService = {
@@ -89,9 +96,15 @@ describe("AuthService", () => {
       reset: jest.fn(),
     };
     config = { get: jest.fn(() => "http://localhost:5173") };
+    twoFactorService = { generateSecret: jest.fn(), generateOtpauthUrl: jest.fn(), verifyCode: jest.fn() };
+    twoFactorChallengeService = { create: jest.fn(), resolve: jest.fn(), consume: jest.fn() };
+    webAuthnService = { generateLoginOptions: jest.fn(), verifyLogin: jest.fn() };
 
     service = new AuthService(
       usersService,
+      twoFactorService,
+      twoFactorChallengeService,
+      webAuthnService,
       sessionsService,
       passwordService,
       tokenService,
@@ -196,13 +209,95 @@ describe("AuthService", () => {
       passwordService.verify.mockResolvedValue(true);
 
       const result = await service.login({ email: user.email, password: "Senha@123" }, metadata);
+      if ("requires2FA" in result) throw new Error("expected tokens, got a 2FA challenge");
 
       expect(loginLockoutService.reset).toHaveBeenCalledWith(user.email, metadata.ipAddress);
       expect(usersService.updateLastLogin).toHaveBeenCalledWith(user.id);
       expect(sessionsService.create).toHaveBeenCalled();
       expect(result.accessToken).toBe("access-token");
       expect(result.refreshToken).toBe("refresh-token");
-      expect(result.expiresIn).toBe(900);
+      expect(result.expiresIn).toBe(3600);
+    });
+
+    it("sends the new-device alert only when this user agent hasn't logged in before", async () => {
+      const user = buildUser({ newDeviceAlertEnabled: true });
+      usersService.findByEmail.mockResolvedValue(user);
+      passwordService.verify.mockResolvedValue(true);
+      sessionsService.hasSessionWithUserAgent.mockResolvedValue(false);
+
+      await service.login({ email: user.email, password: "Senha@123" }, metadata);
+
+      expect(sessionsService.hasSessionWithUserAgent).toHaveBeenCalledWith(
+        user.id,
+        metadata.userAgent,
+      );
+      expect(emailService.sendNewLoginAlert).toHaveBeenCalledWith(
+        user.email,
+        user.name,
+        metadata.ipAddress,
+        metadata.userAgent,
+      );
+    });
+
+    it("does not send the new-device alert for a user agent that already has a session", async () => {
+      const user = buildUser({ newDeviceAlertEnabled: true });
+      usersService.findByEmail.mockResolvedValue(user);
+      passwordService.verify.mockResolvedValue(true);
+      sessionsService.hasSessionWithUserAgent.mockResolvedValue(true);
+
+      await service.login({ email: user.email, password: "Senha@123" }, metadata);
+
+      expect(emailService.sendNewLoginAlert).not.toHaveBeenCalled();
+    });
+
+    it("returns a 2FA challenge instead of tokens when the user has 2FA enabled", async () => {
+      const user = buildUser({ twoFactorEnabled: true });
+      usersService.findByEmail.mockResolvedValue(user);
+      passwordService.verify.mockResolvedValue(true);
+      twoFactorChallengeService.create.mockResolvedValue("challenge-token");
+
+      const result = await service.login({ email: user.email, password: "Senha@123" }, metadata);
+
+      expect(twoFactorChallengeService.create).toHaveBeenCalledWith(user.id);
+      expect(result).toEqual({ requires2FA: true, challengeToken: "challenge-token" });
+      expect(sessionsService.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("verifyTwoFactor", () => {
+    it("rejects an unknown or expired challenge token", async () => {
+      twoFactorChallengeService.resolve.mockResolvedValue(null);
+
+      await expect(
+        service.verifyTwoFactor("bad-token", "123456", metadata),
+      ).rejects.toBeInstanceOf(TwoFactorChallengeInvalidException);
+    });
+
+    it("rejects an incorrect code without consuming the challenge", async () => {
+      const user = buildUser({ twoFactorEnabled: true });
+      twoFactorChallengeService.resolve.mockResolvedValue(user.id);
+      usersService.findById.mockResolvedValue(user);
+      usersService.getTwoFactorSecret.mockResolvedValue("secret");
+      twoFactorService.verifyCode.mockResolvedValue(false);
+
+      await expect(
+        service.verifyTwoFactor("challenge-token", "000000", metadata),
+      ).rejects.toBeInstanceOf(TwoFactorCodeInvalidException);
+      expect(twoFactorChallengeService.consume).not.toHaveBeenCalled();
+    });
+
+    it("issues tokens and consumes the challenge once the code is valid", async () => {
+      const user = buildUser({ twoFactorEnabled: true });
+      twoFactorChallengeService.resolve.mockResolvedValue(user.id);
+      usersService.findById.mockResolvedValue(user);
+      usersService.getTwoFactorSecret.mockResolvedValue("secret");
+      twoFactorService.verifyCode.mockResolvedValue(true);
+
+      const result = await service.verifyTwoFactor("challenge-token", "123456", metadata);
+
+      expect(twoFactorChallengeService.consume).toHaveBeenCalledWith("challenge-token");
+      expect(sessionsService.create).toHaveBeenCalled();
+      expect(result.accessToken).toBe("access-token");
     });
   });
 

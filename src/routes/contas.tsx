@@ -21,6 +21,7 @@ import { PluggyConnectButton } from "@/components/contas/pluggy-connect-button";
 import { useConnectedAccounts, useConnections, useSyncAccount } from "@/hooks/use-open-finance";
 import { requireAuth } from "@/lib/auth";
 import { formatBRL, formatDateTime } from "@/lib/finance-format";
+import { MaskableAmount } from "@/components/ui/maskable-amount";
 import { cn } from "@/lib/utils";
 import type { ConnectedAccount, ConnectionStatus } from "@/types/open-finance";
 
@@ -147,7 +148,9 @@ function AccountCard({
 
         <div>
           <p className="text-xs text-muted-foreground">Saldo atualizado</p>
-          <p className="text-xl font-semibold tracking-tight">{formatBRL(account.balance)}</p>
+          <p className="text-xl font-semibold tracking-tight">
+            <MaskableAmount value={formatBRL(account.balance)} />
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -221,7 +224,7 @@ function ContasPage() {
               <Skeleton className="mt-2 h-8 w-32" />
             ) : (
               <p className="mt-1 text-2xl font-semibold tracking-tight">
-                {formatBRL(totalBalance)}
+                <MaskableAmount value={formatBRL(totalBalance)} />
               </p>
             )}
           </CardContent>

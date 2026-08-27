@@ -318,6 +318,58 @@ export class GoalInvestmentAlreadyLinkedException extends AppException {
   }
 }
 
+export class TwoFactorSetupNotFoundException extends AppException {
+  constructor() {
+    super(
+      "TWO_FACTOR_SETUP_NOT_FOUND",
+      "Nenhuma configuração de 2FA pendente. Inicie o processo novamente.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class TwoFactorCodeInvalidException extends AppException {
+  constructor() {
+    super("TWO_FACTOR_CODE_INVALID", "Código de verificação inválido.", HttpStatus.UNAUTHORIZED);
+  }
+}
+
+export class TwoFactorChallengeInvalidException extends AppException {
+  constructor() {
+    super(
+      "TWO_FACTOR_CHALLENGE_INVALID",
+      "Sessão de verificação expirada. Faça login novamente.",
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+}
+
+export class WebAuthnChallengeMissingException extends AppException {
+  constructor() {
+    super(
+      "WEBAUTHN_CHALLENGE_MISSING",
+      "Sessão de verificação expirada. Tente novamente.",
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+}
+
+export class WebAuthnVerificationFailedException extends AppException {
+  constructor() {
+    super(
+      "WEBAUTHN_VERIFICATION_FAILED",
+      "Não foi possível verificar a biometria. Tente novamente.",
+      HttpStatus.UNAUTHORIZED,
+    );
+  }
+}
+
+export class NotificationNotFoundException extends AppException {
+  constructor() {
+    super("NOTIFICATION_NOT_FOUND", "Notificação não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
 export class AiConversationNotFoundException extends AppException {
   constructor() {
     super("AI_CONVERSATION_NOT_FOUND", "Conversa não encontrada.", HttpStatus.NOT_FOUND);
@@ -328,8 +380,18 @@ export class AiApiKeyMissingException extends AppException {
   constructor() {
     super(
       "AI_API_KEY_MISSING",
-      "Configure sua chave da OpenAI em Configurações para usar o Certo IA.",
+      "A Certo IA não está configurada. Cadastre uma chave de IA em Configurações para usá-la.",
       HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class AiFreeTierLimitException extends AppException {
+  constructor() {
+    super(
+      "AI_FREE_TIER_LIMIT",
+      "Você atingiu o limite diário da Certo IA no modo gratuito. Cadastre sua própria chave em Configurações para uso ilimitado, ou tente novamente amanhã.",
+      HttpStatus.TOO_MANY_REQUESTS,
     );
   }
 }
@@ -381,10 +443,14 @@ export class FamilyAccessDeniedException extends AppException {
 }
 
 export class AiProviderException extends AppException {
-  constructor() {
+  /** `detail` (upstream status/body) is appended to the message outside production only, so a
+   * developer can see why the provider call failed without digging through server logs. */
+  constructor(detail?: string) {
     super(
       "AI_PROVIDER_UNAVAILABLE",
-      "O Certo IA está indisponível no momento. Tente novamente em instantes.",
+      process.env.NODE_ENV !== "production" && detail
+        ? `O Certo IA está indisponível no momento. [dev] ${detail}`
+        : "O Certo IA está indisponível no momento. Tente novamente em instantes.",
       HttpStatus.SERVICE_UNAVAILABLE,
     );
   }
