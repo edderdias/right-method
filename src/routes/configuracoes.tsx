@@ -17,6 +17,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Smartphone,
+  Sparkles,
   Sun,
   User,
   UserPlus,
@@ -57,6 +58,7 @@ import {
 } from "@/hooks/use-family";
 import {
   useAiCredentialsStatus,
+  useAiFreeTierStatus,
   useRemoveAiCredentials,
   useSaveAiCredentials,
 } from "@/hooks/use-ai-chat";
@@ -270,8 +272,10 @@ function ConfiguracoesPage() {
 
   const [apiKeyInput, setApiKeyInput] = useState("");
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showKeyForm, setShowKeyForm] = useState(false);
   const [aiProviderInput, setAiProviderInput] = useState<AiProvider>("OPENAI");
   const { data: aiCredentialsStatus } = useAiCredentialsStatus();
+  const { data: aiFreeTier } = useAiFreeTierStatus();
   const saveAiCredentialsMutation = useSaveAiCredentials();
   const removeAiCredentialsMutation = useRemoveAiCredentials();
 
@@ -493,83 +497,125 @@ function ConfiguracoesPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Escolha o provedor de IA e cadastre sua própria chave para usar o Certo IA com a
-                sua conta.
-              </p>
               {aiCredentialsStatus?.hasKey ? (
-                <div className="flex items-center justify-between rounded-2xl bg-surface-2 p-3">
-                  <div className="flex items-center gap-3">
-                    <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
-                      <KeyRound className="size-4" aria-hidden="true" />
-                    </span>
-                    <div>
-                      <p className="text-sm font-medium">
-                        {
-                          aiProviderOptions.find((o) => o.value === aiCredentialsStatus.provider)
-                            ?.label
-                        }
-                      </p>
-                      <p className="text-xs text-muted-foreground">••••••••••••••••</p>
+                <>
+                  <p className="text-xs text-muted-foreground">
+                    Você está usando a sua própria chave — sem limite de mensagens.
+                  </p>
+                  <div className="flex items-center justify-between rounded-2xl bg-surface-2 p-3">
+                    <div className="flex items-center gap-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
+                        <KeyRound className="size-4" aria-hidden="true" />
+                      </span>
+                      <div>
+                        <p className="text-sm font-medium">
+                          {
+                            aiProviderOptions.find((o) => o.value === aiCredentialsStatus.provider)
+                              ?.label
+                          }
+                        </p>
+                        <p className="text-xs text-muted-foreground">••••••••••••••••</p>
+                      </div>
                     </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="text-destructive"
-                    onClick={() => removeAiCredentialsMutation.mutate()}
-                    disabled={removeAiCredentialsMutation.isPending}
-                  >
-                    Remover
-                  </Button>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <Select
-                    value={aiProviderInput}
-                    onValueChange={(value) => setAiProviderInput(value as AiProvider)}
-                  >
-                    <SelectTrigger className="h-11 rounded-xl">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {aiProviderOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <div className="relative">
-                    <Input
-                      type={showApiKey ? "text" : "password"}
-                      placeholder={
-                        aiProviderOptions.find((o) => o.value === aiProviderInput)?.placeholder
-                      }
-                      value={apiKeyInput}
-                      onChange={(e) => setApiKeyInput(e.target.value)}
-                      className="h-11 rounded-xl pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowApiKey((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-                      aria-label={showApiKey ? "Ocultar chave" : "Mostrar chave"}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => removeAiCredentialsMutation.mutate()}
+                      disabled={removeAiCredentialsMutation.isPending}
                     >
-                      {showApiKey ? (
-                        <EyeOff className="size-4" aria-hidden="true" />
-                      ) : (
-                        <Eye className="size-4" aria-hidden="true" />
-                      )}
-                    </button>
+                      Remover
+                    </Button>
                   </div>
-                  <Button
-                    className="w-full rounded-xl bg-gradient-brand font-semibold"
-                    onClick={handleSaveApiKey}
-                    disabled={!apiKeyInput.trim() || saveAiCredentialsMutation.isPending}
-                  >
-                    Salvar chave
-                  </Button>
+                </>
+              ) : (
+                <div className="space-y-3">
+                  {aiFreeTier?.active && (
+                    <div className="flex items-start gap-3 rounded-2xl bg-surface-2 p-3">
+                      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-card text-primary">
+                        <Sparkles className="size-4" aria-hidden="true" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">Modo gratuito ativo</p>
+                        <p className="text-xs text-muted-foreground">
+                          Gemini (Google) · {aiFreeTier.remaining} de {aiFreeTier.limit} mensagens
+                          restantes hoje
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {showKeyForm || !aiFreeTier?.active ? (
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground">
+                        Cadastre a chave do provedor da sua escolha para uso ilimitado, com a sua
+                        própria conta.
+                      </p>
+                      <Select
+                        value={aiProviderInput}
+                        onValueChange={(value) => setAiProviderInput(value as AiProvider)}
+                      >
+                        <SelectTrigger className="h-11 rounded-xl">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {aiProviderOptions.map((option) => (
+                            <SelectItem key={option.value} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <div className="relative">
+                        <Input
+                          type={showApiKey ? "text" : "password"}
+                          placeholder={
+                            aiProviderOptions.find((o) => o.value === aiProviderInput)?.placeholder
+                          }
+                          value={apiKeyInput}
+                          onChange={(e) => setApiKeyInput(e.target.value)}
+                          className="h-11 rounded-xl pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey((v) => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+                          aria-label={showApiKey ? "Ocultar chave" : "Mostrar chave"}
+                        >
+                          {showApiKey ? (
+                            <EyeOff className="size-4" aria-hidden="true" />
+                          ) : (
+                            <Eye className="size-4" aria-hidden="true" />
+                          )}
+                        </button>
+                      </div>
+                      <Button
+                        className="w-full rounded-xl bg-gradient-brand font-semibold"
+                        onClick={handleSaveApiKey}
+                        disabled={!apiKeyInput.trim() || saveAiCredentialsMutation.isPending}
+                      >
+                        Salvar chave
+                      </Button>
+                      {aiFreeTier?.active && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          onClick={() => setShowKeyForm(false)}
+                        >
+                          Cancelar
+                        </Button>
+                      )}
+                    </div>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      className="w-full rounded-xl"
+                      onClick={() => setShowKeyForm(true)}
+                    >
+                      Usar minha própria chave
+                    </Button>
+                  )}
                 </div>
               )}
             </CardContent>

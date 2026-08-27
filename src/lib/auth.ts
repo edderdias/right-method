@@ -4,10 +4,9 @@ import type {
   PublicKeyCredentialRequestOptionsJSON,
 } from "@simplewebauthn/browser";
 
-import { apiPost } from "@/lib/api-client";
+import { apiPost, clearSession, getAccessToken, setSessionTokens } from "@/lib/api-client";
 
-const ACCESS_TOKEN_KEY = "mc_access_token";
-const REFRESH_TOKEN_KEY = "mc_refresh_token";
+export { clearSession, getAccessToken } from "@/lib/api-client";
 
 export interface AuthUser {
   id: string;
@@ -36,19 +35,8 @@ export type LoginResult =
   | { requires2FA: false; user: AuthUser }
   | { requires2FA: true; challengeToken: string };
 
-export function getAccessToken(): string | null {
-  if (typeof window === "undefined") return null;
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
-}
-
 export function isAuthenticated(): boolean {
   return Boolean(getAccessToken());
-}
-
-export function clearSession(): void {
-  if (typeof window === "undefined") return;
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 export async function login(email: string, password: string): Promise<LoginResult> {
@@ -56,8 +44,7 @@ export async function login(email: string, password: string): Promise<LoginResul
   if ("requires2FA" in data) {
     return data;
   }
-  localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  setSessionTokens(data);
   return { requires2FA: false, user: data.user };
 }
 
@@ -66,8 +53,7 @@ export async function verifyTwoFactorLogin(
   code: string,
 ): Promise<AuthUser> {
   const { data } = await apiPost<LoginResponse>("/auth/2fa/verify", { challengeToken, code });
-  localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  setSessionTokens(data);
   return data.user;
 }
 
@@ -92,8 +78,7 @@ export async function verifyWebAuthnLogin(
     ceremonyId,
     response,
   });
-  localStorage.setItem(ACCESS_TOKEN_KEY, data.accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, data.refreshToken);
+  setSessionTokens(data);
   return data.user;
 }
 

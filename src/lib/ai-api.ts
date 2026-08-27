@@ -12,8 +12,19 @@ export interface AiCredentialsStatus {
   hasKey: boolean;
 }
 
+export type FreeTierStatus =
+  | { active: false }
+  | { active: true; provider: AiProvider; used: number; limit: number; remaining: number };
+
 export async function getAiCredentialsStatus(): Promise<AiCredentialsStatus> {
   const { data } = await apiGet<ApiEnvelope<AiCredentialsStatus>>("/users/me/ai-credentials");
+  return data;
+}
+
+export async function getAiFreeTierStatus(): Promise<FreeTierStatus> {
+  const { data } = await apiGet<ApiEnvelope<FreeTierStatus>>(
+    "/ai/conversations/free-tier-status",
+  );
   return data;
 }
 

@@ -32,8 +32,9 @@ export const envSchema = z.object({
    * Optional — without it, accounts still sync via the manual "Sincronizar agora" action. */
   API_PUBLIC_URL: z.preprocess((v) => (v === "" ? undefined : v), z.string().url().optional()),
 
-  /** Optional global fallback — normally each user configures their own key (and provider) in
-   * Configurações. The fallback is always OpenAI; Anthropic/Google require a per-user key. */
+  /** Optional global fallback keys. A user who hasn't set their own key/provider in Configurações
+   * falls back to GOOGLE_API_KEY (shared Gemini free tier) if set, otherwise OPENAI_API_KEY.
+   * Shared-key usage is capped per user per day (AI_FREE_DAILY_LIMIT). */
   OPENAI_API_KEY: z.string().optional(),
   OPENAI_MODEL: z.string().default("gpt-4o-mini"),
   OPENAI_BASE_URL: z.string().url().default("https://api.openai.com/v1"),
@@ -41,11 +42,16 @@ export const envSchema = z.object({
   ANTHROPIC_MODEL: z.string().default("claude-sonnet-5"),
   ANTHROPIC_BASE_URL: z.string().url().default("https://api.anthropic.com/v1"),
 
-  GOOGLE_MODEL: z.string().default("gemini-2.0-flash"),
+  /** Shared Gemini key — enables the free tier for users without their own key. */
+  GOOGLE_API_KEY: z.string().optional(),
+  GOOGLE_MODEL: z.string().default("gemini-3.6-flash"),
   GOOGLE_BASE_URL: z
     .string()
     .url()
     .default("https://generativelanguage.googleapis.com/v1beta"),
+
+  /** Per-user daily message cap when running on a shared fallback key. */
+  AI_FREE_DAILY_LIMIT: z.coerce.number().default(20),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

@@ -1,6 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ChevronLeft, Pencil, Plus, RefreshCw, ShieldCheck, Trash2, Wifi } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Pencil,
+  Plus,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  Wifi,
+  X,
+} from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -35,6 +45,7 @@ import { PayInvoiceDialog } from "@/components/cartoes/pay-invoice-dialog";
 import { PurchaseFormDialog } from "@/components/cartoes/purchase-form-dialog";
 import { useExpenseCategories } from "@/hooks/use-expenses";
 import {
+  useCardResponsiblesSummary,
   useCreditCard,
   useCreditCardInvoices,
   useCreditCardPurchases,
@@ -122,6 +133,7 @@ function CartaoDetailPage() {
   const [period, setPeriod] = useState<PeriodFilter>("30days");
   const [categoryId, setCategoryId] = useState<string>("all");
   const [invoiceId, setInvoiceId] = useState<string>("all");
+  const [responsibleName, setResponsibleName] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [payingInvoice, setPayingInvoice] = useState<CreditCardInvoice | null>(null);
   const [editingPurchase, setEditingPurchase] = useState<CreditCardPurchase | null>(null);
@@ -131,7 +143,12 @@ function CartaoDetailPage() {
 
   useEffect(() => {
     setPage(1);
+    setResponsibleName(null);
   }, [period, categoryId, invoiceId]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [responsibleName]);
 
   const range = resolveRange(period);
   const cardQuery = useCreditCard(cardId);
@@ -139,11 +156,18 @@ function CartaoDetailPage() {
   const categoriesQuery = useExpenseCategories();
   const syncCard = useSyncCreditCard();
 
-  const purchasesQuery = useCreditCardPurchases(cardId, {
+  const sharedFilters = {
     ...(range.from ? { from: range.from } : {}),
     ...(range.to ? { to: range.to } : {}),
     ...(categoryId !== "all" ? { categoryId } : {}),
     ...(invoiceId !== "all" ? { invoiceId } : {}),
+  };
+
+  const responsiblesQuery = useCardResponsiblesSummary(cardId, sharedFilters);
+
+  const purchasesQuery = useCreditCardPurchases(cardId, {
+    ...sharedFilters,
+    ...(responsibleName ? { responsibleName } : {}),
     page,
     pageSize: 20,
   });
@@ -157,6 +181,10 @@ function CartaoDetailPage() {
   const total = purchasesQuery.data?.total ?? 0;
   const pageSize = purchasesQuery.data?.pageSize ?? 20;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const responsibles = responsiblesQuery.data ?? [];
+  const responsiblesTotal = responsibles.reduce((sum, row) => sum + row.total, 0);
+  const periodLabel = PERIOD_OPTIONS.find((option) => option.key === period)?.label ?? "";
 
   const limit = card?.creditLimit ?? 0;
   const available = card?.availableLimit ?? limit;
@@ -366,6 +394,69 @@ function CartaoDetailPage() {
       </Card>
 
       <Card className="rounded-3xl border-border/70 shadow-soft">
+        <CardHeader className="flex-row flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-base font-semibold">Gastos por responsável</CardTitle>
+          <span className="text-xs text-muted-foreground">{periodLabel}</span>
+        </CardHeader>
+        <CardContent>
+          {responsiblesQuery.isLoading ? (
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <Skeleton key={index} className="h-10 w-full rounded-xl" />
+              ))}
+            </div>
+          ) : responsibles.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Nenhuma compra no período selecionado.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border/60">
+              {responsibles.map((row) => {
+                const label = row.responsibleName ?? "Sem responsável";
+                const isActive = responsibleName === row.responsibleName;
+                const pct =
+                  responsiblesTotal > 0 ? Math.round((row.total / responsiblesTotal) * 100) : 0;
+                const drillable = row.responsibleName !== null;
+                return (
+                  <li key={label}>
+                    <button
+                      type="button"
+                      disabled={!drillable}
+                      aria-pressed={isActive}
+                      onClick={() =>
+                        setResponsibleName(isActive ? null : row.responsibleName)
+                      }
+                      className={cn(
+                        "flex w-full items-center justify-between gap-3 py-2.5 text-left text-sm transition-colors",
+                        drillable ? "hover:text-primary" : "cursor-default",
+                        isActive && "text-primary",
+                      )}
+                    >
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate font-medium">{label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {row.count} {row.count === 1 ? "compra" : "compras"} · {pct}%
+                        </span>
+                      </span>
+                      <span className="flex items-center gap-1 whitespace-nowrap font-semibold">
+                        {formatBRL(row.total)}
+                        {drillable && (
+                          <ChevronRight
+                            className="size-4 text-muted-foreground"
+                            aria-hidden="true"
+                          />
+                        )}
+                      </span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="rounded-3xl border-border/70 shadow-soft">
         <CardHeader className="flex-col items-stretch gap-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <CardTitle className="text-base font-semibold">Extrato</CardTitle>
@@ -427,6 +518,16 @@ function CartaoDetailPage() {
                 ))}
               </SelectContent>
             </Select>
+            {responsibleName && (
+              <button
+                type="button"
+                onClick={() => setResponsibleName(null)}
+                className="inline-flex items-center gap-1 rounded-full bg-primary/12 px-3 py-1 text-xs font-medium text-primary"
+              >
+                Responsável: {responsibleName}
+                <X className="size-3" aria-hidden="true" />
+              </button>
+            )}
           </div>
         </CardHeader>
 
@@ -455,6 +556,7 @@ function CartaoDetailPage() {
                   <TableHead>Data</TableHead>
                   <TableHead>Descrição</TableHead>
                   <TableHead>Categoria</TableHead>
+                  <TableHead>Responsável</TableHead>
                   <TableHead>Parcela</TableHead>
                   <TableHead className="text-right">Valor</TableHead>
                   <TableHead />
@@ -483,6 +585,9 @@ function CartaoDetailPage() {
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {purchase.category?.name ?? "Sem categoria"}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {purchase.responsibleName ?? "—"}
                     </TableCell>
                     <TableCell className="text-muted-foreground">
                       {purchase.installmentNumber && purchase.installmentTotal

@@ -6,6 +6,7 @@ import { AiApiKeyMissingException } from "../../common/exceptions/app.exception"
 import { UsersService } from "../users/users.service";
 import { AiConversationsService } from "./ai-conversations.service";
 import { AiContextService } from "./ai-context.service";
+import { AiFreeTierLimiterService } from "./ai-free-tier-limiter.service";
 import { AiProviderRegistry } from "./providers/ai-provider-registry.service";
 import type { ChatHistoryEntry } from "./providers/ai-provider.interface";
 
@@ -26,6 +27,7 @@ export class AiChatService {
     private readonly context: AiContextService,
     private readonly providerRegistry: AiProviderRegistry,
     private readonly users: UsersService,
+    private readonly freeTierLimiter: AiFreeTierLimiterService,
   ) {}
 
   async sendMessage(
@@ -46,11 +48,31 @@ export class AiChatService {
       .map((m) => ({ role: m.role, content: m.content }));
 
     const credentials = await this.users.getAiCredentials(userId);
-    const apiKey = credentials?.apiKey ?? this.config.get("OPENAI_API_KEY");
-    if (!apiKey) {
-      throw new AiApiKeyMissingException();
+    let provider: AiProvider;
+    let apiKey: string;
+    let usingSharedKey = false;
+
+    if (credentials) {
+      provider = credentials.provider;
+      apiKey = credentials.apiKey;
+    } else {
+      const googleKey = this.config.get("GOOGLE_API_KEY");
+      const openaiKey = this.config.get("OPENAI_API_KEY");
+      if (googleKey) {
+        provider = AiProvider.GOOGLE;
+        apiKey = googleKey;
+      } else if (openaiKey) {
+        provider = AiProvider.OPENAI;
+        apiKey = openaiKey;
+      } else {
+        throw new AiApiKeyMissingException();
+      }
+      usingSharedKey = true;
     }
-    const provider = credentials?.provider ?? AiProvider.OPENAI;
+
+    if (usingSharedKey) {
+      await this.freeTierLimiter.assertWithinLimit(userId);
+    }
 
     const financialContext = await this.context.buildContext(userId);
     const completion = await this.providerRegistry.complete(
@@ -60,6 +82,10 @@ export class AiChatService {
       financialContext,
       apiKey,
     );
+
+    if (usingSharedKey) {
+      await this.freeTierLimiter.registerUse(userId);
+    }
 
     const [userMessage, assistantMessage] = await this.prisma.$transaction([
       this.prisma.aiMessage.create({

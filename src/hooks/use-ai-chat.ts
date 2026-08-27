@@ -7,6 +7,7 @@ import {
   deleteAiConversation,
   getAiConversation,
   getAiCredentialsStatus,
+  getAiFreeTierStatus,
   listAiConversations,
   removeAiCredentials,
   renameAiConversation,
@@ -20,6 +21,7 @@ export const aiKeys = {
   conversations: ["ai", "conversations"] as const,
   conversation: (id: string) => ["ai", "conversations", id] as const,
   credentialsStatus: ["ai", "credentials"] as const,
+  freeTierStatus: ["ai", "free-tier"] as const,
 };
 
 const GENERIC_ERROR_MESSAGE = "Não foi possível falar com o Certo IA agora. Tente novamente.";
@@ -78,6 +80,10 @@ export function useAiCredentialsStatus() {
   return useQuery({ queryKey: aiKeys.credentialsStatus, queryFn: getAiCredentialsStatus });
 }
 
+export function useAiFreeTierStatus() {
+  return useQuery({ queryKey: aiKeys.freeTierStatus, queryFn: getAiFreeTierStatus });
+}
+
 export function useSaveAiCredentials() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -85,6 +91,7 @@ export function useSaveAiCredentials() {
       saveAiCredentials(provider, apiKey),
     onSuccess: (data) => {
       queryClient.setQueryData(aiKeys.credentialsStatus, data);
+      void queryClient.invalidateQueries({ queryKey: aiKeys.freeTierStatus });
       toast.success("Credenciais de IA salvas com sucesso.");
     },
     onError: (error) => toast.error(toErrorMessage(error)),
@@ -97,6 +104,7 @@ export function useRemoveAiCredentials() {
     mutationFn: removeAiCredentials,
     onSuccess: (data) => {
       queryClient.setQueryData(aiKeys.credentialsStatus, data);
+      void queryClient.invalidateQueries({ queryKey: aiKeys.freeTierStatus });
       toast.success("Credenciais de IA removidas.");
     },
     onError: (error) => toast.error(toErrorMessage(error)),
@@ -120,6 +128,7 @@ export function useSendAiMessage() {
             : current,
       );
       void queryClient.invalidateQueries({ queryKey: aiKeys.conversations });
+      void queryClient.invalidateQueries({ queryKey: aiKeys.freeTierStatus });
     },
     onError: (error) => toast.error(toErrorMessage(error)),
   });

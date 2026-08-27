@@ -380,8 +380,18 @@ export class AiApiKeyMissingException extends AppException {
   constructor() {
     super(
       "AI_API_KEY_MISSING",
-      "Configure sua chave da OpenAI em Configurações para usar o Certo IA.",
+      "A Certo IA não está configurada. Cadastre uma chave de IA em Configurações para usá-la.",
       HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class AiFreeTierLimitException extends AppException {
+  constructor() {
+    super(
+      "AI_FREE_TIER_LIMIT",
+      "Você atingiu o limite diário da Certo IA no modo gratuito. Cadastre sua própria chave em Configurações para uso ilimitado, ou tente novamente amanhã.",
+      HttpStatus.TOO_MANY_REQUESTS,
     );
   }
 }
@@ -433,10 +443,14 @@ export class FamilyAccessDeniedException extends AppException {
 }
 
 export class AiProviderException extends AppException {
-  constructor() {
+  /** `detail` (upstream status/body) is appended to the message outside production only, so a
+   * developer can see why the provider call failed without digging through server logs. */
+  constructor(detail?: string) {
     super(
       "AI_PROVIDER_UNAVAILABLE",
-      "O Certo IA está indisponível no momento. Tente novamente em instantes.",
+      process.env.NODE_ENV !== "production" && detail
+        ? `O Certo IA está indisponível no momento. [dev] ${detail}`
+        : "O Certo IA está indisponível no momento. Tente novamente em instantes.",
       HttpStatus.SERVICE_UNAVAILABLE,
     );
   }

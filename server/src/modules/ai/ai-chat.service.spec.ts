@@ -37,6 +37,7 @@ describe("AiChatService", () => {
   let context: any;
   let provider: any;
   let users: any;
+  let freeTierLimiter: any;
   let service: AiChatService;
 
   beforeEach(() => {
@@ -48,7 +49,19 @@ describe("AiChatService", () => {
     users = {
       getAiCredentials: jest.fn().mockResolvedValue({ provider: "OPENAI", apiKey: "sk-user-key" }),
     };
-    service = new AiChatService(prisma, config, conversations, context, provider, users);
+    freeTierLimiter = {
+      assertWithinLimit: jest.fn().mockResolvedValue(undefined),
+      registerUse: jest.fn().mockResolvedValue(undefined),
+    };
+    service = new AiChatService(
+      prisma,
+      config,
+      conversations,
+      context,
+      provider,
+      users,
+      freeTierLimiter,
+    );
   });
 
   it("never calls the LLM provider for a conversation the user does not own", async () => {
@@ -80,14 +93,76 @@ describe("AiChatService", () => {
     );
   });
 
-  it("refuses to call the provider when the user has no AI key configured", async () => {
+  it("refuses to call the provider when there is no user key and no shared fallback key", async () => {
     users.getAiCredentials.mockResolvedValue(null);
     conversations.assertOwnership.mockResolvedValue({ id: "conv-1", title: "Nova conversa" });
 
     await expect(service.sendMessage("user-1", "conv-1", "Oi")).rejects.toThrow(
-      "Configure sua chave da OpenAI",
+      "A Certo IA não está configurada",
     );
     expect(provider.complete).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the shared Google key when the user has no key of their own", async () => {
+    users.getAiCredentials.mockResolvedValue(null);
+    config.get.mockImplementation((key: string) =>
+      key === "GOOGLE_API_KEY" ? "shared-gemini-key" : undefined,
+    );
+    conversations.assertOwnership.mockResolvedValue({ id: "conv-1", title: "Nova conversa" });
+    prisma.$transaction.mockResolvedValue([
+      { id: "msg-user", role: AiMessageRole.USER, content: "Oi" },
+      { id: "msg-assistant", role: AiMessageRole.ASSISTANT, content: "Olá!" },
+    ]);
+
+    await service.sendMessage("user-1", "conv-1", "Oi");
+
+    expect(freeTierLimiter.assertWithinLimit).toHaveBeenCalledWith("user-1");
+    expect(provider.complete).toHaveBeenCalledWith(
+      "GOOGLE",
+      [],
+      "Oi",
+      FAKE_CONTEXT,
+      "shared-gemini-key",
+    );
+    expect(freeTierLimiter.registerUse).toHaveBeenCalledWith("user-1");
+  });
+
+  it("blocks a shared-key request when the user hit the daily free-tier limit", async () => {
+    users.getAiCredentials.mockResolvedValue(null);
+    config.get.mockImplementation((key: string) =>
+      key === "GOOGLE_API_KEY" ? "shared-gemini-key" : undefined,
+    );
+    conversations.assertOwnership.mockResolvedValue({ id: "conv-1", title: "Nova conversa" });
+    freeTierLimiter.assertWithinLimit.mockRejectedValue(new Error("limite diário"));
+
+    await expect(service.sendMessage("user-1", "conv-1", "Oi")).rejects.toThrow("limite diário");
+    expect(provider.complete).not.toHaveBeenCalled();
+    expect(freeTierLimiter.registerUse).not.toHaveBeenCalled();
+  });
+
+  it("does not touch the free-tier limiter when the user brings their own key", async () => {
+    conversations.assertOwnership.mockResolvedValue({ id: "conv-1", title: "Plano de viagem" });
+    prisma.$transaction.mockResolvedValue([
+      { id: "msg-user", role: AiMessageRole.USER, content: "Oi" },
+      { id: "msg-assistant", role: AiMessageRole.ASSISTANT, content: "Olá!" },
+    ]);
+
+    await service.sendMessage("user-1", "conv-1", "Oi");
+
+    expect(freeTierLimiter.assertWithinLimit).not.toHaveBeenCalled();
+    expect(freeTierLimiter.registerUse).not.toHaveBeenCalled();
+  });
+
+  it("does not consume free-tier quota when the provider call fails", async () => {
+    users.getAiCredentials.mockResolvedValue(null);
+    config.get.mockImplementation((key: string) =>
+      key === "GOOGLE_API_KEY" ? "shared-gemini-key" : undefined,
+    );
+    conversations.assertOwnership.mockResolvedValue({ id: "conv-1", title: "Nova conversa" });
+    provider.complete.mockRejectedValue(new Error("provider down"));
+
+    await expect(service.sendMessage("user-1", "conv-1", "Oi")).rejects.toThrow("provider down");
+    expect(freeTierLimiter.registerUse).not.toHaveBeenCalled();
   });
 
   it("persists both the user message and the assistant reply, and auto-titles a fresh conversation", async () => {

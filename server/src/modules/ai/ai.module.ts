@@ -8,6 +8,7 @@ import { AiController } from "./ai.controller";
 import { AiConversationsService } from "./ai-conversations.service";
 import { AiChatService } from "./ai-chat.service";
 import { AiContextService } from "./ai-context.service";
+import { AiFreeTierLimiterService } from "./ai-free-tier-limiter.service";
 import { AiProviderRegistry } from "./providers/ai-provider-registry.service";
 import { AnthropicProviderService } from "./providers/anthropic-provider.service";
 import { GoogleProviderService } from "./providers/google-provider.service";
@@ -20,6 +21,7 @@ import { OpenAiProviderService } from "./providers/openai-provider.service";
     AiConversationsService,
     AiChatService,
     AiContextService,
+    AiFreeTierLimiterService,
     AiProviderRegistry,
     OpenAiProviderService,
     AnthropicProviderService,
