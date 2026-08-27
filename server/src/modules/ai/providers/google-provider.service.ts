@@ -75,7 +75,13 @@ export class GoogleProviderService implements AiProviderAdapter {
       throw new AiProviderException(`Gemini HTTP ${response.status}: ${body.slice(0, 600)}`);
     }
 
-    const payload = await response.json();
+    let payload;
+    try {
+      payload = await response.json();
+    } catch (error) {
+      this.logger.error(`Resposta do Gemini não é JSON: ${(error as Error).message}`);
+      throw new AiProviderException(`Gemini resposta não-JSON: ${(error as Error).message}`);
+    }
     const raw = payload?.candidates?.[0]?.content?.parts?.[0]?.text;
     if (typeof raw !== "string") {
       this.logger.error(`Resposta do Gemini sem conteúdo utilizável: ${JSON.stringify(payload)}`);
@@ -96,7 +102,9 @@ export class GoogleProviderService implements AiProviderAdapter {
         ...(parsed.suggestedLabel ? { suggestedLabel: parsed.suggestedLabel } : {}),
       };
     } catch (error) {
-      this.logger.error(`Falha ao interpretar resposta JSON do Gemini: ${(error as Error).message}`);
+      this.logger.error(
+        `Falha ao interpretar resposta JSON do Gemini: ${(error as Error).message}`,
+      );
       throw new AiProviderException(`Gemini JSON inválido: ${raw.slice(0, 300)}`);
     }
   }
