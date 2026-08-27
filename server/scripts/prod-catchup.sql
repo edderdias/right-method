@@ -1,30 +1,44 @@
 -- ============================================================================
 -- Catch-up manual do banco de PRODUÇÃO — Método Certo
 -- ----------------------------------------------------------------------------
--- Aplica as 6 migrations que faltam em produção (o que causa
--- "column users.hideBalances does not exist" no login).
+-- Conserta a migration que ficou FAILED em prod (P3009,
+-- 20260825172924_add_pluggy_user_credentials) e aplica as 6 seguintes que
+-- faltam (o que causa "column users.hideBalances does not exist" no login).
 --
--- PREFIRA `npx prisma migrate deploy` — este script é só para desbloquear
--- rápido quando não há acesso à CLI no ambiente de produção.
+-- Tudo é idempotente (IF NOT EXISTS / guards), seguro de rodar mesmo com o
+-- banco parcialmente migrado. Registra tudo no histórico do Prisma com o
+-- checksum correto — depois disso `prisma migrate deploy` fica limpo.
 --
--- Tudo aqui é idempotente (IF NOT EXISTS / guards), então é seguro rodar
--- mesmo que o banco já tenha parte das mudanças.
+-- Rode inteiro:  psql "$DATABASE_URL" -f scripts/prod-catchup.sql
+-- Depois:        npx prisma migrate deploy   (deve dizer "No pending migrations")
 --
--- 1) Rode o diagnóstico abaixo. Se a última migration NÃO for
---    20260823005918_add_user_settings_and_family_sharing, PARE e use a CLI
---    (`npx prisma migrate deploy`) — este script cobre só as 6 seguintes.
--- 2) Rode este script inteiro:  psql "$DATABASE_URL" -f scripts/prod-catchup.sql
---
--- O bloco final registra as migrations no histórico do Prisma com o checksum
--- correto, então o `migrate deploy` dos próximos deploys reconhece tudo como
--- aplicado e não tenta reaplicar. (Validado: `prisma migrate status` fica limpo.)
+-- DIAGNÓSTICO (opcional, rode antes):
+--   SELECT migration_name, finished_at, rolled_back_at
+--   FROM "_prisma_migrations" ORDER BY started_at;
 -- ============================================================================
 
--- DIAGNÓSTICO (rode isolado antes):
---   SELECT migration_name, finished_at
---   FROM "_prisma_migrations" ORDER BY started_at;
-
 BEGIN;
+
+-- 20260825172924_add_pluggy_user_credentials -------------------------------
+-- Esta é a migration que ficou FAILED em prod (P3009), provavelmente porque as
+-- colunas já existiam. Garante as colunas e conserta o registro no histórico.
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "pluggyClientId" TEXT;
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS "pluggyClientSecretEncrypted" TEXT;
+
+UPDATE "_prisma_migrations"
+SET finished_at = now(), rolled_back_at = NULL, applied_steps_count = 1, logs = NULL
+WHERE migration_name = '20260825172924_add_pluggy_user_credentials'
+  AND finished_at IS NULL;
+
+INSERT INTO "_prisma_migrations"
+  (id, checksum, migration_name, started_at, finished_at, applied_steps_count)
+SELECT gen_random_uuid(),
+       '9e68ae2d7959e4e94534da96168d4b824e4970d2869a7bcb4226c35b1d47a924',
+       '20260825172924_add_pluggy_user_credentials', now(), now(), 1
+WHERE NOT EXISTS (
+  SELECT 1 FROM "_prisma_migrations" m
+  WHERE m.migration_name = '20260825172924_add_pluggy_user_credentials'
+);
 
 -- 20260825182148_add_ai_provider_selection -----------------------------------
 DO $$ BEGIN
