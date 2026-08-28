@@ -25,6 +25,7 @@ const DEFAULT_EXPENSE_CATEGORIES = [
   "Impostos",
   "Contas",
   "Investimentos",
+  "Cartão de crédito",
   "Outros",
 ];
 

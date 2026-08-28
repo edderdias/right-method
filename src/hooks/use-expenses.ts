@@ -11,7 +11,7 @@ import {
   listExpenses,
   updateExpense,
 } from "@/lib/finance-api";
-import { dashboardKeys } from "@/hooks/use-revenues";
+import { accountKeys, dashboardKeys } from "@/hooks/use-revenues";
 import type {
   CreateExpenseInput,
   DashboardPeriodParams,
@@ -37,6 +37,7 @@ const GENERIC_ERROR_MESSAGE = "Não foi possível salvar a despesa. Tente novame
 function invalidateFinanceQueries(queryClient: ReturnType<typeof useQueryClient>) {
   void queryClient.invalidateQueries({ queryKey: expenseKeys.all });
   void queryClient.invalidateQueries({ queryKey: dashboardKeys.all });
+  void queryClient.invalidateQueries({ queryKey: accountKeys.all });
 }
 
 function toErrorMessage(error: unknown): string {

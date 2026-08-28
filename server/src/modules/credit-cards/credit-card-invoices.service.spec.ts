@@ -21,7 +21,15 @@ function createPrismaMock() {
     },
     creditCard: {
       findUnique: jest.fn(),
+      findUniqueOrThrow: jest.fn(),
       update: jest.fn(),
+    },
+    category: {
+      findFirst: jest.fn(),
+      create: jest.fn(),
+    },
+    expense: {
+      create: jest.fn(),
     },
   };
   prisma.$transaction = jest.fn(async (callback: (tx: unknown) => unknown) => callback(prisma));
@@ -108,11 +116,11 @@ describe("CreditCardInvoicesService", () => {
         paidAmount: invoice.totalAmount,
         paidFromAccountId: "acc-1",
       });
-      prisma.creditCard.findUnique.mockResolvedValue({
-        id: "card-1",
-        source: "MANUAL",
-        creditLimit: new Prisma.Decimal(1000),
-      });
+      const card = { id: "card-1", name: "Nubank", source: "MANUAL", creditLimit: new Prisma.Decimal(1000) };
+      prisma.creditCard.findUnique.mockResolvedValue(card);
+      prisma.creditCard.findUniqueOrThrow.mockResolvedValue(card);
+      prisma.category.findFirst.mockResolvedValue({ id: "cat-card" });
+      prisma.expense.create.mockResolvedValue({ id: "exp-1" });
       prisma.creditCardPurchase.aggregate = jest.fn().mockResolvedValue({ _sum: { amount: null } });
 
       const result = await service.pay("user-1", "inv-1", { accountId: "acc-1" });
@@ -122,6 +130,11 @@ describe("CreditCardInvoicesService", () => {
         where: { id: "acc-1" },
         data: { balance: { decrement: invoice.totalAmount } },
       });
+      expect(prisma.expense.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ status: "PAID", amount: invoice.totalAmount }),
+        }),
+      );
       expect(prisma.creditCardInvoice.update).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { id: "inv-1" },

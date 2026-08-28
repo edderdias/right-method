@@ -2,11 +2,14 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import {
   AlertTriangle,
+  ArrowLeftRight,
   Building2,
   CheckCircle2,
   Clock,
   Landmark,
   Link2,
+  Pencil,
+  Plus,
   RefreshCw,
   Trash2,
   Wallet,
@@ -16,29 +19,47 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { AccountFormDialog } from "@/components/contas/account-form-dialog";
+import { DeleteManualAccountDialog } from "@/components/contas/delete-manual-account-dialog";
 import { DisconnectAccountDialog } from "@/components/contas/disconnect-account-dialog";
 import { PluggyConnectButton } from "@/components/contas/pluggy-connect-button";
+import { TransferDialog } from "@/components/contas/transfer-dialog";
 import { useConnectedAccounts, useConnections, useSyncAccount } from "@/hooks/use-open-finance";
+import {
+  useAccountTransfers,
+  useAccounts,
+  useDeleteAccountTransfer,
+} from "@/hooks/use-revenues";
 import { requireAuth } from "@/lib/auth";
-import { formatBRL, formatDateTime } from "@/lib/finance-format";
+import { formatBRL, formatDateTime, formatShortDate } from "@/lib/finance-format";
 import { MaskableAmount } from "@/components/ui/maskable-amount";
 import { cn } from "@/lib/utils";
+import type { Account } from "@/types/finance";
 import type { ConnectedAccount, ConnectionStatus } from "@/types/open-finance";
 
 export const Route = createFileRoute("/contas")({
   beforeLoad: requireAuth,
   head: () => ({
     meta: [
-      { title: "Contas bancárias | Método Certo" },
+      { title: "Contas | Método Certo" },
       {
         name: "description",
         content:
-          "Conecte suas contas via Open Finance e acompanhe saldo e extrato reais em um só lugar.",
+          "Cadastre contas manuais com saldo, transfira valores entre contas e conecte contas via Open Finance.",
       },
-      { property: "og:title", content: "Contas bancárias | Método Certo" },
+      { property: "og:title", content: "Contas | Método Certo" },
       {
         property: "og:description",
-        content: "Conecte suas contas via Open Finance e acompanhe saldo e extrato reais.",
+        content: "Saldo por conta, transferências e Open Finance em um só lugar.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -82,24 +103,207 @@ function StatusPill({ status }: { status: ConnectionStatus }) {
   );
 }
 
-function EmptyAccountsState() {
+function ManualAccountsTab() {
+  const accountsQuery = useAccounts();
+  const transfersQuery = useAccountTransfers();
+  const deleteTransfer = useDeleteAccountTransfer();
+
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<Account | null>(null);
+  const [deletingAccount, setDeletingAccount] = useState<Account | null>(null);
+  const [transferOpen, setTransferOpen] = useState(false);
+
+  const accounts = accountsQuery.data ?? [];
+  const transfers = transfersQuery.data ?? [];
+  const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+
+  function openCreate() {
+    setEditingAccount(null);
+    setFormOpen(true);
+  }
+
+  function openEdit(account: Account) {
+    setEditingAccount(account);
+    setFormOpen(true);
+  }
+
   return (
-    <div className="flex flex-col items-center gap-3 py-12 text-center">
-      <span className="grid size-14 place-items-center rounded-2xl bg-primary/12 text-primary">
-        <Link2 className="size-7" aria-hidden="true" />
-      </span>
-      <div>
-        <p className="text-sm font-semibold">Nenhuma conta conectada.</p>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Conecte uma conta via Open Finance para ver seu extrato real aqui.
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          O saldo dessas contas é somado às suas receitas na página de Receitas.
         </p>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            className="rounded-xl"
+            disabled={accounts.length < 2}
+            onClick={() => setTransferOpen(true)}
+          >
+            <ArrowLeftRight className="size-4" aria-hidden="true" />
+            Transferir
+          </Button>
+          <Button onClick={openCreate} className="rounded-xl bg-gradient-brand font-semibold">
+            <Plus className="size-4" aria-hidden="true" />
+            Nova conta
+          </Button>
+        </div>
       </div>
-      <PluggyConnectButton className="rounded-xl bg-gradient-brand font-semibold" />
+
+      <Card className="rounded-3xl border-border/70 bg-gradient-surface shadow-soft">
+        <CardContent className="p-5">
+          <p className="text-sm text-muted-foreground">Saldo consolidado (contas manuais)</p>
+          {accountsQuery.isLoading ? (
+            <Skeleton className="mt-2 h-8 w-32" />
+          ) : (
+            <p className="mt-1 text-2xl font-semibold tracking-tight">
+              <MaskableAmount value={formatBRL(totalBalance)} />
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <section>
+        {accountsQuery.isLoading ? (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <Skeleton key={index} className="h-40 w-full rounded-3xl" />
+            ))}
+          </div>
+        ) : accounts.length === 0 ? (
+          <Card className="rounded-3xl border-border/70 shadow-soft">
+            <CardContent className="flex flex-col items-center gap-3 py-12 text-center">
+              <span className="grid size-14 place-items-center rounded-2xl bg-primary/12 text-primary">
+                <Wallet className="size-7" aria-hidden="true" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold">Nenhuma conta cadastrada.</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Cadastre uma conta e informe o saldo existente para acompanhar seu dinheiro.
+                </p>
+              </div>
+              <Button onClick={openCreate} className="rounded-xl bg-gradient-brand font-semibold">
+                <Plus className="size-4" aria-hidden="true" />
+                Nova conta
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            {accounts.map((account) => (
+              <Card key={account.id} className="rounded-3xl border-border/70 shadow-soft">
+                <CardContent className="space-y-4 p-5">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="grid size-11 shrink-0 place-items-center rounded-2xl bg-primary/12 text-primary">
+                        <Wallet className="size-5" aria-hidden="true" />
+                      </span>
+                      <p className="truncate text-sm font-semibold">{account.name}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-lg"
+                        aria-label="Editar conta"
+                        onClick={() => openEdit(account)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="rounded-lg text-destructive hover:text-destructive"
+                        aria-label="Excluir conta"
+                        onClick={() => setDeletingAccount(account)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">Saldo</p>
+                    <p className="text-xl font-semibold tracking-tight">
+                      <MaskableAmount value={formatBRL(account.balance)} />
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <Card className="rounded-3xl border-border/70 shadow-soft">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Transferências recentes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {transfersQuery.isLoading ? (
+            <Skeleton className="h-24 w-full rounded-2xl" />
+          ) : transfers.length === 0 ? (
+            <p className="py-4 text-center text-sm text-muted-foreground">
+              Nenhuma transferência registrada.
+            </p>
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Data</TableHead>
+                  <TableHead>De → Para</TableHead>
+                  <TableHead>Descrição</TableHead>
+                  <TableHead className="text-right">Valor</TableHead>
+                  <TableHead />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {transfers.map((transfer) => (
+                  <TableRow key={transfer.id}>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatShortDate(transfer.transferDate)}
+                    </TableCell>
+                    <TableCell>
+                      {transfer.fromAccountName} → {transfer.toAccountName}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {transfer.description ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-right font-semibold whitespace-nowrap">
+                      {formatBRL(transfer.amount)}
+                    </TableCell>
+                    <TableCell>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-8 rounded-lg text-destructive hover:text-destructive"
+                        aria-label="Estornar transferência"
+                        disabled={deleteTransfer.isPending}
+                        onClick={() => deleteTransfer.mutate(transfer.id)}
+                      >
+                        <Trash2 className="size-3.5" />
+                      </Button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      <AccountFormDialog open={formOpen} onOpenChange={setFormOpen} account={editingAccount} />
+      <DeleteManualAccountDialog
+        account={deletingAccount}
+        onOpenChange={(open) => {
+          if (!open) setDeletingAccount(null);
+        }}
+      />
+      <TransferDialog open={transferOpen} onOpenChange={setTransferOpen} />
     </div>
   );
 }
 
-function AccountCard({
+function OpenFinanceAccountCard({
   account,
   onSync,
   onDisconnect,
@@ -185,7 +389,7 @@ function AccountCard({
   );
 }
 
-function ContasPage() {
+function OpenFinanceTab() {
   const accountsQuery = useConnectedAccounts();
   const connectionsQuery = useConnections();
   const syncAccount = useSyncAccount();
@@ -205,14 +409,11 @@ function ContasPage() {
   }
 
   return (
-    <AppShell>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Contas bancárias</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Conecte suas contas via Open Finance — sem informar senha do banco no Método Certo.
-          </p>
-        </div>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          Conecte suas contas via Open Finance — sem informar senha do banco no Método Certo.
+        </p>
         <PluggyConnectButton className="rounded-xl bg-gradient-brand font-semibold" />
       </div>
 
@@ -288,13 +489,24 @@ function ContasPage() {
         ) : accounts.length === 0 ? (
           <Card className="rounded-3xl border-border/70 shadow-soft">
             <CardContent>
-              <EmptyAccountsState />
+              <div className="flex flex-col items-center gap-3 py-12 text-center">
+                <span className="grid size-14 place-items-center rounded-2xl bg-primary/12 text-primary">
+                  <Link2 className="size-7" aria-hidden="true" />
+                </span>
+                <div>
+                  <p className="text-sm font-semibold">Nenhuma conta conectada.</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Conecte uma conta via Open Finance para ver seu extrato real aqui.
+                  </p>
+                </div>
+                <PluggyConnectButton className="rounded-xl bg-gradient-brand font-semibold" />
+              </div>
             </CardContent>
           </Card>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {accounts.map((account) => (
-              <AccountCard
+              <OpenFinanceAccountCard
                 key={account.id}
                 account={account}
                 syncing={syncingId === account.id}
@@ -345,6 +557,32 @@ function ContasPage() {
           if (!open) setDisconnecting(null);
         }}
       />
+    </div>
+  );
+}
+
+function ContasPage() {
+  return (
+    <AppShell>
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Contas</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Cadastre contas manuais, transfira valores entre elas e conecte contas via Open Finance.
+        </p>
+      </div>
+
+      <Tabs defaultValue="manual" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="manual">Minhas contas</TabsTrigger>
+          <TabsTrigger value="open-finance">Open Finance</TabsTrigger>
+        </TabsList>
+        <TabsContent value="manual">
+          <ManualAccountsTab />
+        </TabsContent>
+        <TabsContent value="open-finance">
+          <OpenFinanceTab />
+        </TabsContent>
+      </Tabs>
     </AppShell>
   );
 }

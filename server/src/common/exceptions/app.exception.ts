@@ -102,6 +102,28 @@ export class CategoryNotFoundException extends AppException {
   }
 }
 
+export class AccountInUseException extends AppException {
+  constructor() {
+    super(
+      "ACCOUNT_IN_USE",
+      "Não é possível excluir esta conta porque há lançamentos ou transferências vinculados a ela.",
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class InvalidAccountTransferException extends AppException {
+  constructor(message = "Transferência inválida.") {
+    super("INVALID_ACCOUNT_TRANSFER", message, HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+}
+
+export class AccountTransferNotFoundException extends AppException {
+  constructor() {
+    super("ACCOUNT_TRANSFER_NOT_FOUND", "Transferência não encontrada.", HttpStatus.NOT_FOUND);
+  }
+}
+
 export class ExpenseNotFoundException extends AppException {
   constructor() {
     super("EXPENSE_NOT_FOUND", "Despesa não encontrada.", HttpStatus.NOT_FOUND);

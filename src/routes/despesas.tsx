@@ -35,6 +35,7 @@ import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DeleteExpenseDialog } from "@/components/despesas/delete-expense-dialog";
 import { ExpenseFormDialog } from "@/components/despesas/expense-form-dialog";
+import { PayExpenseDialog } from "@/components/despesas/pay-expense-dialog";
 import {
   useExpenseCategories,
   useExpenses,
@@ -128,6 +129,7 @@ function DespesasPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [deletingExpense, setDeletingExpense] = useState<Expense | null>(null);
+  const [payingExpense, setPayingExpense] = useState<Expense | null>(null);
 
   const range =
     periodMode === "last30days"
@@ -166,8 +168,11 @@ function DespesasPage() {
   }
 
   function toggleStatus(expense: Expense) {
-    const nextStatus: "PENDING" | "PAID" = expense.status === "PAID" ? "PENDING" : "PAID";
-    updateExpense.mutate({ id: expense.id, payload: { status: nextStatus } });
+    if (expense.status === "PAID") {
+      updateExpense.mutate({ id: expense.id, payload: { status: "PENDING" } });
+      return;
+    }
+    setPayingExpense(expense);
   }
 
   function goToPreviousMonth() {
@@ -565,6 +570,12 @@ function DespesasPage() {
         expense={deletingExpense}
         onOpenChange={(open) => {
           if (!open) setDeletingExpense(null);
+        }}
+      />
+      <PayExpenseDialog
+        expense={payingExpense}
+        onOpenChange={(open) => {
+          if (!open) setPayingExpense(null);
         }}
       />
     </AppShell>

@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/table";
 import { ArchiveCreditCardDialog } from "@/components/cartoes/archive-credit-card-dialog";
 import { DeletePurchaseDialog } from "@/components/cartoes/delete-purchase-dialog";
+import { EditCreditCardDialog } from "@/components/cartoes/edit-credit-card-dialog";
 import { PayInvoiceDialog } from "@/components/cartoes/pay-invoice-dialog";
 import { PurchaseFormDialog } from "@/components/cartoes/purchase-form-dialog";
 import { useExpenseCategories } from "@/hooks/use-expenses";
@@ -140,6 +141,7 @@ function CartaoDetailPage() {
   const [deletingPurchase, setDeletingPurchase] = useState<CreditCardPurchase | null>(null);
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
   const [archiving, setArchiving] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     setPage(1);
@@ -253,14 +255,24 @@ function CartaoDetailPage() {
                 </Button>
               )}
               {card?.source === "MANUAL" && (
-                <Button
-                  variant="ghost"
-                  className="rounded-xl text-destructive"
-                  onClick={() => setArchiving(true)}
-                >
-                  <Trash2 className="size-4" aria-hidden="true" />
-                  Excluir
-                </Button>
+                <>
+                  <Button
+                    variant="secondary"
+                    className="rounded-xl"
+                    onClick={() => setEditing(true)}
+                  >
+                    <Pencil className="size-4" aria-hidden="true" />
+                    Editar
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="rounded-xl text-destructive"
+                    onClick={() => setArchiving(true)}
+                  >
+                    <Trash2 className="size-4" aria-hidden="true" />
+                    Excluir
+                  </Button>
+                </>
               )}
             </div>
           </div>
@@ -696,6 +708,7 @@ function CartaoDetailPage() {
           onArchived={() => navigate({ to: "/cartoes" })}
         />
       )}
+      <EditCreditCardDialog open={editing} onOpenChange={setEditing} card={card ?? null} />
     </AppShell>
   );
 }

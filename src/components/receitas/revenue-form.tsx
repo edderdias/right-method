@@ -119,15 +119,17 @@ interface RevenueFormProps {
 
 function InlineCreateAccount({ onCreated }: { onCreated: (accountId: string) => void }) {
   const [name, setName] = useState("");
+  const [balance, setBalance] = useState<number | undefined>(undefined);
   const createAccount = useCreateAccount();
 
   function handleCreate() {
     if (!name.trim()) return;
     createAccount.mutate(
-      { name: name.trim() },
+      { name: name.trim(), ...(balance !== undefined ? { initialBalance: balance } : {}) },
       {
         onSuccess: (account) => {
           setName("");
+          setBalance(undefined);
           onCreated(account.id);
         },
       },
@@ -135,12 +137,18 @@ function InlineCreateAccount({ onCreated }: { onCreated: (accountId: string) => 
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-dashed border-input p-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-dashed border-input p-2">
       <Input
         value={name}
         onChange={(event) => setName(event.target.value)}
         placeholder="Nome da conta (ex: Conta corrente)"
-        className="h-8"
+        className="h-8 min-w-40 flex-1"
+      />
+      <MoneyInput
+        value={balance}
+        onChange={setBalance}
+        placeholder="Saldo"
+        className="h-8 w-28"
       />
       <Button
         type="button"

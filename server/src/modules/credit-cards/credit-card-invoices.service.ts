@@ -1,5 +1,11 @@
 import { Injectable } from "@nestjs/common";
-import { CreditCardInvoice, CreditCardInvoiceStatus, Prisma } from "@prisma/client";
+import {
+  CategoryType,
+  CreditCardInvoice,
+  CreditCardInvoiceStatus,
+  ExpenseStatus,
+  Prisma,
+} from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { AccountsService } from "../accounts/accounts.service";
 import {
@@ -8,6 +14,7 @@ import {
 } from "../../common/exceptions/app.exception";
 import {
   addMonthsToDateOnly,
+  formatDateOnly,
   parseDateOnly,
   startOfTodaySaoPaulo,
 } from "../../common/utils/date-only";
@@ -27,6 +34,7 @@ export type PublicInvoice = Omit<CreditCardInvoice, "totalAmount" | "paidAmount"
 
 const DEFAULT_CLOSING_DAY = 1;
 const DEFAULT_DUE_DAY = 10;
+const CARD_EXPENSE_CATEGORY_NAME = "Cartão de crédito";
 
 @Injectable()
 export class CreditCardInvoicesService {
@@ -120,6 +128,7 @@ export class CreditCardInvoicesService {
       throw new CreditCardInvoiceAlreadyPaidException();
     }
     await this.accountsService.assertOwnership(userId, dto.accountId);
+    const card = await this.prisma.creditCard.findUniqueOrThrow({ where: { id: invoice.cardId } });
     const paidAt = dto.paidAt ? parseDateOnly(dto.paidAt) : startOfTodaySaoPaulo();
 
     const updated = await this.prisma.$transaction(async (tx) => {
@@ -127,6 +136,30 @@ export class CreditCardInvoicesService {
         where: { id: dto.accountId },
         data: { balance: { decrement: invoice.totalAmount } },
       });
+
+      // Book the invoice payment as a (already paid) expense so it shows up in Despesas and the
+      // category reports. Created directly here so it does NOT re-debit the account — the debit
+      // above already accounts for it.
+      let paidExpenseId: string | null = null;
+      if (Number(invoice.totalAmount) > 0) {
+        const categoryId = await this.resolveCardExpenseCategoryId(tx, userId);
+        const referenceLabel = formatDateOnly(invoice.referenceMonth).slice(0, 7);
+        const expense = await tx.expense.create({
+          data: {
+            userId,
+            description: `Fatura ${card.name} (${referenceLabel})`,
+            amount: invoice.totalAmount,
+            categoryId,
+            accountId: dto.accountId,
+            dueDate: invoice.dueDate,
+            paidAt,
+            status: ExpenseStatus.PAID,
+            creditCardId: card.id,
+          },
+        });
+        paidExpenseId = expense.id;
+      }
+
       const paid = await tx.creditCardInvoice.update({
         where: { id: invoiceId },
         data: {
@@ -134,6 +167,7 @@ export class CreditCardInvoicesService {
           paidAmount: invoice.totalAmount,
           paidAt,
           paidFromAccountId: dto.accountId,
+          paidExpenseId,
         },
       });
       await recalculateCardAvailableLimit(tx, invoice.cardId);
@@ -141,6 +175,27 @@ export class CreditCardInvoicesService {
     });
 
     return this.toPublic(updated);
+  }
+
+  /** Finds the global "Cartão de crédito" expense category (seeded by migration), falling back to
+   * a per-user one, creating it on demand if neither exists. */
+  private async resolveCardExpenseCategoryId(
+    tx: Prisma.TransactionClient,
+    userId: string,
+  ): Promise<string> {
+    const existing = await tx.category.findFirst({
+      where: {
+        name: CARD_EXPENSE_CATEGORY_NAME,
+        type: CategoryType.EXPENSE,
+        OR: [{ userId: null }, { userId }],
+      },
+    });
+    if (existing) return existing.id;
+
+    const created = await tx.category.create({
+      data: { userId: null, name: CARD_EXPENSE_CATEGORY_NAME, type: CategoryType.EXPENSE },
+    });
+    return created.id;
   }
 
   async findOwnedOrThrow(userId: string, id: string): Promise<CreditCardInvoice> {

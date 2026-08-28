@@ -6,6 +6,7 @@ import { DashboardService } from "./dashboard.service";
 import { DashboardPeriodQueryDto } from "./dto/dashboard-period-query.dto";
 import { RevenuesEvolutionQueryDto } from "./dto/revenues-evolution-query.dto";
 import { ExpensesEvolutionQueryDto } from "./dto/expenses-evolution-query.dto";
+import { AccountsSummaryQueryDto } from "../accounts/dto/accounts-summary-query.dto";
 
 @ApiTags("dashboard")
 @ApiBearerAuth()
@@ -61,5 +62,29 @@ export class DashboardController {
     const period = this.dashboardService.resolvePeriod(query);
     const data = await this.dashboardService.getExpensesByCategory(user.sub, period);
     return { message: "Despesas por categoria.", data };
+  }
+
+  @Get("accounts-summary")
+  @ApiOperation({ summary: "Saldo, recebido e gasto por conta no período" })
+  async accountsSummary(
+    @CurrentUser() user: JwtPayload,
+    @Query() query: AccountsSummaryQueryDto,
+  ) {
+    const data = await this.dashboardService.getAccountsSummary(user.sub, query);
+    return { message: "Resumo por conta.", data };
+  }
+
+  @Get("upcoming-bills")
+  @ApiOperation({ summary: "Despesas e faturas de cartão a vencer nos próximos dias" })
+  async upcomingBills(@CurrentUser() user: JwtPayload) {
+    const data = await this.dashboardService.getUpcomingBills(user.sub);
+    return { message: "Contas a vencer.", data };
+  }
+
+  @Get("insights")
+  @ApiOperation({ summary: "Resumo com análises reais das finanças do usuário (Certo IA)" })
+  async insights(@CurrentUser() user: JwtPayload) {
+    const data = await this.dashboardService.getInsights(user.sub);
+    return { message: "Resumo do Certo IA.", data };
   }
 }

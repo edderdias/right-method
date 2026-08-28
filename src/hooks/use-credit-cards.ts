@@ -253,6 +253,8 @@ export function usePayInvoice() {
         queryKey: ["credit-cards", variables.cardId, "invoices"],
       });
       void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       invalidateCardAndSummary(queryClient, variables.cardId);
     },
     onError: (error) => toast.error(toErrorMessage(error)),
