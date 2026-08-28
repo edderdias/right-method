@@ -223,6 +223,7 @@ model User {
   notifications          Notification[]
   webAuthnCredentials    WebAuthnCredential[]
   accounts               Account[]
+  accountTransfers       AccountTransfer[]
   categories             Category[]
   revenues               Revenue[]
   expenses               Expense[]
@@ -411,9 +412,31 @@ model Account {
   expenses                 Expense[]
   linkedGoals              FinancialGoal[]   @relation("GoalLinkedAccount")
   goalTransactionsAsSource GoalTransaction[] @relation("GoalTransactionSourceAccount")
+  transfersOut             AccountTransfer[] @relation("AccountTransfersOut")
+  transfersIn              AccountTransfer[] @relation("AccountTransfersIn")
 
   @@index([userId])
   @@map("accounts")
+}
+
+model AccountTransfer {
+  id            String   @id @default(uuid())
+  userId        String
+  fromAccountId String
+  toAccountId   String
+  amount        Decimal  @db.Decimal(12, 2)
+  transferDate  DateTime @db.Date
+  description   String?
+  createdAt     DateTime @default(now())
+
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  fromAccount Account @relation("AccountTransfersOut", fields: [fromAccountId], references: [id], onDelete: Cascade)
+  toAccount   Account @relation("AccountTransfersIn", fields: [toAccountId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([fromAccountId])
+  @@index([toAccountId])
+  @@map("account_transfers")
 }
 
 model Category {
@@ -633,6 +656,7 @@ model CreditCardInvoice {
   status            CreditCardInvoiceStatus @default(OPEN)
   paidAt            DateTime?
   paidFromAccountId String?
+  paidExpenseId     String?
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
 

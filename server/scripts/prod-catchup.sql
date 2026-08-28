@@ -9,15 +9,19 @@
 -- banco parcialmente migrado. Registra tudo no histórico do Prisma com o
 -- checksum correto — depois disso `prisma migrate deploy` fica limpo.
 --
--- Rode inteiro:  psql "$DATABASE_URL" -f scripts/prod-catchup.sql
--- Depois:        npx prisma migrate deploy   (deve dizer "No pending migrations")
+-- Onde rodar (qualquer um):
+--   a) Railway → serviço Postgres → aba "Data"/Query → cola este arquivo → Run
+--   b) npx prisma db execute --file scripts/prod-catchup.sql --schema prisma/schema.prisma
+--   c) psql "$DATABASE_URL" -f scripts/prod-catchup.sql
+-- Depois: npx prisma migrate deploy   (deve dizer "No pending migrations to apply")
+--
+-- Sem BEGIN/COMMIT de propósito (compatível com `prisma db execute`). Cada bloco
+-- é guardado, então rodar de novo após uma falha parcial é seguro.
 --
 -- DIAGNÓSTICO (opcional, rode antes):
 --   SELECT migration_name, finished_at, rolled_back_at
 --   FROM "_prisma_migrations" ORDER BY started_at;
 -- ============================================================================
-
-BEGIN;
 
 -- 20260825172924_add_pluggy_user_credentials -------------------------------
 -- Esta é a migration que ficou FAILED em prod (P3009), provavelmente porque as
@@ -142,5 +146,3 @@ FROM (VALUES
 WHERE NOT EXISTS (
   SELECT 1 FROM "_prisma_migrations" m WHERE m.migration_name = v.name
 );
-
-COMMIT;

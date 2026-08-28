@@ -35,13 +35,14 @@ export class NotificationsScanService {
   }
 
   private async scanBillsDue(): Promise<void> {
-    const targetDate = addDaysToDateOnly(startOfTodaySaoPaulo(), BILL_DUE_LOOKAHEAD_DAYS);
-    const expenses = await this.prisma.expense.findMany({
+    const today = startOfTodaySaoPaulo();
+    const targetDate = addDaysToDateOnly(today, BILL_DUE_LOOKAHEAD_DAYS);
+
+    const upcoming = await this.prisma.expense.findMany({
       where: { status: ExpenseStatus.PENDING, dueDate: targetDate },
       select: { id: true, userId: true, description: true, amount: true },
     });
-
-    for (const expense of expenses) {
+    for (const expense of upcoming) {
       await this.notifications.create({
         userId: expense.userId,
         type: "BILL_DUE",
@@ -49,6 +50,21 @@ export class NotificationsScanService {
         body: `${expense.description} — ${formatBRL(Number(expense.amount))} vence em ${BILL_DUE_LOOKAHEAD_DAYS} dias.`,
         link: "/despesas",
         entityId: expense.id,
+      });
+    }
+
+    const dueToday = await this.prisma.expense.findMany({
+      where: { status: ExpenseStatus.PENDING, dueDate: today },
+      select: { id: true, userId: true, description: true, amount: true },
+    });
+    for (const expense of dueToday) {
+      await this.notifications.create({
+        userId: expense.userId,
+        type: "BILL_DUE",
+        title: "Conta vence hoje",
+        body: `${expense.description} — ${formatBRL(Number(expense.amount))} vence hoje.`,
+        link: "/despesas",
+        entityId: `${expense.id}:due-today`,
       });
     }
   }
@@ -86,6 +102,24 @@ export class NotificationsScanService {
         body: `A fatura do cartão ${invoice.card.name} (${formatBRL(Number(invoice.totalAmount))}) vence em ${INVOICE_LOOKAHEAD_DAYS} dias.`,
         link: "/cartoes",
         entityId: invoice.id,
+      });
+    }
+
+    const dueToday = await this.prisma.creditCardInvoice.findMany({
+      where: {
+        status: { notIn: [CreditCardInvoiceStatus.PAID] },
+        dueDate: startOfTodaySaoPaulo(),
+      },
+      select: { id: true, userId: true, totalAmount: true, card: { select: { name: true } } },
+    });
+    for (const invoice of dueToday) {
+      await this.notifications.create({
+        userId: invoice.userId,
+        type: "CARD_INVOICE_DUE",
+        title: "Fatura vence hoje",
+        body: `A fatura do cartão ${invoice.card.name} (${formatBRL(Number(invoice.totalAmount))}) vence hoje.`,
+        link: "/cartoes",
+        entityId: `${invoice.id}:due-today`,
       });
     }
   }

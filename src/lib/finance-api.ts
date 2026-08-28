@@ -1,10 +1,14 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import type {
   Account,
+  AccountsPeriodSummary,
+  AccountTransfer,
   Category,
   CreateAccountInput,
   CreateExpenseInput,
   CreateRevenueInput,
+  CreateTransferInput,
+  DashboardInsight,
   DashboardPeriodParams,
   DashboardSummary,
   Expense,
@@ -17,6 +21,9 @@ import type {
   RevenueListResponse,
   RevenuesByCategoryPoint,
   RevenuesEvolutionPoint,
+  TransferResult,
+  UpcomingBill,
+  UpdateAccountInput,
   UpdateExpenseInput,
   UpdateRevenueInput,
 } from "@/types/finance";
@@ -57,6 +64,51 @@ export async function listAccounts(): Promise<Account[]> {
 
 export async function createAccount(payload: CreateAccountInput): Promise<Account> {
   const { data } = await apiPost<ApiEnvelope<Account>>("/accounts", payload);
+  return data;
+}
+
+export async function updateAccount(id: string, payload: UpdateAccountInput): Promise<Account> {
+  const { data } = await apiPatch<ApiEnvelope<Account>>(`/accounts/${id}`, payload);
+  return data;
+}
+
+export async function deleteAccount(id: string): Promise<void> {
+  await apiDelete<ApiEnvelope<null>>(`/accounts/${id}`);
+}
+
+export async function transferBetweenAccounts(
+  payload: CreateTransferInput,
+): Promise<TransferResult> {
+  const { data } = await apiPost<ApiEnvelope<TransferResult>>("/accounts/transfer", payload);
+  return data;
+}
+
+export async function listAccountTransfers(): Promise<AccountTransfer[]> {
+  const { data } = await apiGet<ApiEnvelope<AccountTransfer[]>>("/accounts/transfers");
+  return data;
+}
+
+export async function deleteAccountTransfer(id: string): Promise<void> {
+  await apiDelete<ApiEnvelope<null>>(`/accounts/transfers/${id}`);
+}
+
+export async function getAccountsSummary(
+  period: DashboardPeriodParams = {},
+): Promise<AccountsPeriodSummary> {
+  const { data } = await apiGet<ApiEnvelope<AccountsPeriodSummary>>(
+    "/dashboard/accounts-summary",
+    { ...period },
+  );
+  return data;
+}
+
+export async function getUpcomingBills(): Promise<UpcomingBill[]> {
+  const { data } = await apiGet<ApiEnvelope<UpcomingBill[]>>("/dashboard/upcoming-bills");
+  return data;
+}
+
+export async function getDashboardInsights(): Promise<DashboardInsight[]> {
+  const { data } = await apiGet<ApiEnvelope<DashboardInsight[]>>("/dashboard/insights");
   return data;
 }
 

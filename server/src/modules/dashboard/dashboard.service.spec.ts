@@ -21,7 +21,12 @@ describe("DashboardService", () => {
 
   beforeEach(() => {
     prisma = createPrismaMock();
-    service = new DashboardService(prisma as any);
+    service = new DashboardService(
+      prisma as any,
+      {} as any,
+      {} as any,
+      {} as any,
+    );
   });
 
   describe("resolvePeriod", () => {

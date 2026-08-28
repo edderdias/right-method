@@ -32,7 +32,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MaskableAmount } from "@/components/ui/maskable-amount";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useDashboardSummary, useRevenuesEvolution } from "@/hooks/use-revenues";
+import {
+  useAccountsSummary,
+  useDashboardInsights,
+  useDashboardSummary,
+  useRevenuesEvolution,
+  useUpcomingBills,
+} from "@/hooks/use-revenues";
 import { useExpensesByCategory, useExpensesEvolution } from "@/hooks/use-expenses";
 import { useCreditCardsSummary } from "@/hooks/use-credit-cards";
 import { useFinancialGoals, useFinancialGoalsSummary } from "@/hooks/use-financial-goals";
@@ -69,17 +75,15 @@ const CATEGORY_CHART_COLORS = [
   "var(--chart-5)",
 ];
 
-const contas = [
-  { nome: "Energia elétrica", venc: "Vence em 2 dias", valor: 289 },
-  { nome: "Fatura Cartão Certo", venc: "Vence em 5 dias", valor: 2140 },
-  { nome: "Internet fibra", venc: "Vence em 8 dias", valor: 129 },
-];
-
-const insights = [
-  { texto: "Você gastou 14% mais em alimentação neste mês.", tom: "warning" as const },
-  { texto: "Dá para economizar R$ 280 revisando assinaturas.", tom: "primary" as const },
-  { texto: "Seu patrimônio cresceu 4,2% em 30 dias.", tom: "info" as const },
-];
+function formatDueLabel(dueDate: string): string {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const due = new Date(`${dueDate}T00:00:00`);
+  const diffDays = Math.round((due.getTime() - today.getTime()) / 86_400_000);
+  if (diffDays <= 0) return "Vence hoje";
+  if (diffDays === 1) return "Vence amanhã";
+  return `Vence em ${diffDays} dias`;
+}
 
 function DashboardPage() {
   const currentUserQuery = useCurrentUser();
@@ -98,6 +102,12 @@ function DashboardPage() {
   const investmentsSummary = investmentsSummaryQuery.data;
   const goalsSummaryQuery = useFinancialGoalsSummary();
   const goalsQuery = useFinancialGoals();
+  const insightsQuery = useDashboardInsights();
+  const upcomingBillsQuery = useUpcomingBills();
+  const accountsSummaryQuery = useAccountsSummary({});
+  const insights = insightsQuery.data ?? [];
+  const upcomingBills = upcomingBillsQuery.data ?? [];
+  const accountsSummary = accountsSummaryQuery.data;
   const topGoals = (goalsQuery.data ?? [])
     .filter((goal) => goal.status === "ACTIVE")
     .sort((a, b) => a.daysRemaining - b.daysRemaining)
@@ -163,6 +173,11 @@ function DashboardPage() {
               <MaskableAmount value={brl(summaryQuery.data?.expenses.total ?? 0)} />
             )
           }
+          hint={
+            creditCardsSummary && creditCardsSummary.openInvoicesTotal > 0
+              ? `+ ${brl(creditCardsSummary.openInvoicesTotal)} em faturas de cartão a pagar`
+              : undefined
+          }
           icon={ArrowDownRight}
         />
         <StatCard
@@ -218,21 +233,35 @@ function DashboardPage() {
             <CardTitle className="text-base font-semibold">Resumo do Certo IA</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {insights.map((item) => (
-              <div
-                key={item.texto}
-                className={cn(
-                  "rounded-2xl p-4 text-sm",
-                  item.tom === "warning" && "bg-warning/12 text-foreground",
-                  item.tom === "primary" && "bg-primary/12 text-foreground",
-                  item.tom === "info" && "bg-info/12 text-foreground",
-                )}
-              >
-                {item.texto}
-              </div>
-            ))}
-            <Button className="mt-2 w-full rounded-xl bg-gradient-brand font-semibold">
-              Conversar com o Certo IA
+            {insightsQuery.isLoading ? (
+              <>
+                <Skeleton className="h-16 w-full rounded-2xl" />
+                <Skeleton className="h-16 w-full rounded-2xl" />
+              </>
+            ) : insights.length === 0 ? (
+              <p className="rounded-2xl bg-surface-2 p-4 text-sm text-muted-foreground">
+                Cadastre suas receitas e despesas para receber análises da Certo IA.
+              </p>
+            ) : (
+              insights.map((item) => (
+                <div
+                  key={item.text}
+                  className={cn(
+                    "rounded-2xl p-4 text-sm",
+                    item.tone === "warning" && "bg-warning/12 text-foreground",
+                    item.tone === "primary" && "bg-primary/12 text-foreground",
+                    item.tone === "info" && "bg-info/12 text-foreground",
+                  )}
+                >
+                  {item.text}
+                </div>
+              ))
+            )}
+            <Button
+              asChild
+              className="mt-2 w-full rounded-xl bg-gradient-brand font-semibold"
+            >
+              <Link to="/certo-ia">Conversar com o Certo IA</Link>
             </Button>
           </CardContent>
         </Card>
@@ -361,29 +390,88 @@ function DashboardPage() {
         </Card>
       </section>
 
+      <section>
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader className="flex-row items-center justify-between">
+            <CardTitle className="text-base font-semibold">Saldo por conta</CardTitle>
+            <Link to="/contas" className="text-xs font-medium text-primary hover:underline">
+              Gerenciar contas
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {accountsSummaryQuery.isLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-14 w-full rounded-2xl" />
+                <Skeleton className="h-14 w-full rounded-2xl" />
+              </div>
+            ) : !accountsSummary || accountsSummary.accounts.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 py-6 text-center">
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma conta cadastrada. Cadastre uma conta para acompanhar o saldo individual.
+                </p>
+                <Button asChild variant="secondary" className="rounded-xl">
+                  <Link to="/contas">Cadastrar conta</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {accountsSummary.accounts.map((account) => (
+                  <div key={account.id} className="rounded-2xl bg-surface-2 p-4">
+                    <p className="truncate text-sm font-medium">{account.name}</p>
+                    <p className="mt-1 text-lg font-semibold tracking-tight">
+                      <MaskableAmount value={brl(account.balance)} />
+                    </p>
+                    <div className="mt-2 flex items-center justify-between text-xs">
+                      <span className="text-primary">+{brl(account.received)} recebido</span>
+                      <span className="text-warning">−{brl(account.spent)} gasto</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
       <section className="grid gap-4 lg:grid-cols-2 xl:grid-cols-3">
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardHeader>
             <CardTitle className="text-base font-semibold">Contas a vencer</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {contas.map((conta) => (
-              <div
-                key={conta.nome}
-                className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3"
-              >
-                <div className="flex items-center gap-3">
-                  <span className="grid size-9 place-items-center rounded-xl bg-warning/15 text-warning">
-                    <CalendarClock className="size-4" aria-hidden="true" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-medium">{conta.nome}</p>
-                    <p className="text-xs text-muted-foreground">{conta.venc}</p>
+            {upcomingBillsQuery.isLoading ? (
+              <>
+                <Skeleton className="h-14 w-full rounded-2xl" />
+                <Skeleton className="h-14 w-full rounded-2xl" />
+              </>
+            ) : upcomingBills.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Nenhuma conta ou fatura a vencer nos próximos dias.
+              </p>
+            ) : (
+              upcomingBills.map((bill) => (
+                <Link
+                  key={`${bill.kind}-${bill.id}`}
+                  to={bill.link}
+                  className="flex items-center justify-between rounded-2xl bg-surface-2 px-4 py-3 transition-colors hover:bg-surface"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="grid size-9 place-items-center rounded-xl bg-warning/15 text-warning">
+                      {bill.kind === "invoice" ? (
+                        <CreditCard className="size-4" aria-hidden="true" />
+                      ) : (
+                        <CalendarClock className="size-4" aria-hidden="true" />
+                      )}
+                    </span>
+                    <div>
+                      <p className="text-sm font-medium">{bill.description}</p>
+                      <p className="text-xs text-muted-foreground">{formatDueLabel(bill.dueDate)}</p>
+                    </div>
                   </div>
-                </div>
-                <span className="text-sm font-semibold">{brl(conta.valor)}</span>
-              </div>
-            ))}
+                  <span className="text-sm font-semibold">{brl(bill.amount)}</span>
+                </Link>
+              ))
+            )}
           </CardContent>
         </Card>
 
@@ -497,6 +585,7 @@ function StatCard({
   title,
   value,
   delta,
+  hint,
   positive,
   icon: Icon,
   highlight,
@@ -504,6 +593,7 @@ function StatCard({
   title: string;
   value: ReactNode;
   delta?: string;
+  hint?: ReactNode;
   positive?: boolean;
   icon: typeof Wallet;
   highlight?: boolean;
@@ -538,6 +628,7 @@ function StatCard({
         </div>
         <p className="mt-4 text-sm text-muted-foreground">{title}</p>
         <div className="mt-1 text-2xl font-semibold tracking-tight">{value}</div>
+        {hint && <p className="mt-1 text-xs text-muted-foreground">{hint}</p>}
       </CardContent>
     </Card>
   );

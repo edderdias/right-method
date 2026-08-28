@@ -153,6 +153,66 @@ export interface CreateAccountInput {
   initialBalance?: number;
 }
 
+export interface UpdateAccountInput {
+  name?: string;
+  balance?: number;
+}
+
+export interface AccountTransfer {
+  id: string;
+  fromAccountId: string;
+  toAccountId: string;
+  fromAccountName: string;
+  toAccountName: string;
+  amount: number;
+  transferDate: string;
+  description: string | null;
+  createdAt: string;
+}
+
+export interface CreateTransferInput {
+  fromAccountId: string;
+  toAccountId: string;
+  amount: number;
+  transferDate: string;
+  description?: string;
+}
+
+export interface TransferResult {
+  transfer: AccountTransfer;
+  insufficientFunds: boolean;
+}
+
+export interface AccountPeriodSummaryItem {
+  id: string;
+  name: string;
+  balance: number;
+  received: number;
+  spent: number;
+}
+
+export interface AccountsPeriodSummary {
+  period: { from: string; to: string };
+  accounts: AccountPeriodSummaryItem[];
+  totals: { balance: number; received: number; spent: number };
+}
+
+export type DashboardInsightTone = "primary" | "warning" | "info";
+
+export interface DashboardInsight {
+  text: string;
+  tone: DashboardInsightTone;
+}
+
+export interface UpcomingBill {
+  kind: "expense" | "invoice";
+  id: string;
+  description: string;
+  dueDate: string;
+  amount: number;
+  link: string;
+}
+
 export interface DashboardPeriodParams {
   month?: number;
   year?: number;

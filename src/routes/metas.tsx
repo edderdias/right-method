@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Plus, Search, Sparkles, Target, Trash2 } from "lucide-react";
+import { Pencil, Plus, Search, Sparkles, Target, Trash2 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -139,6 +139,7 @@ function GoalCard({
   selected,
   onSelect,
   onViewDetails,
+  onEdit,
   onArchive,
 }: {
   goal: FinancialGoal;
@@ -146,6 +147,7 @@ function GoalCard({
   selected: boolean;
   onSelect: () => void;
   onViewDetails: () => void;
+  onEdit: () => void;
   onArchive: () => void;
 }) {
   const Icon = GOAL_CATEGORY_ICONS[goal.category];
@@ -176,6 +178,18 @@ function GoalCard({
               {goal.isOverdue && " · Atrasada"}
             </p>
           </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="shrink-0 rounded-lg"
+            aria-label="Editar meta"
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit();
+            }}
+          >
+            <Pencil className="size-4" />
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -224,6 +238,7 @@ function MetasPage() {
   const summary = summaryQuery.data;
 
   const [formOpen, setFormOpen] = useState(false);
+  const [editingGoal, setEditingGoal] = useState<FinancialGoal | null>(null);
   const [contributionGoal, setContributionGoal] = useState<FinancialGoal | null>(null);
   const [archivingGoal, setArchivingGoal] = useState<FinancialGoal | null>(null);
   const [selectedGoalId, setSelectedGoalId] = useState<string | null>(null);
@@ -275,7 +290,10 @@ function MetasPage() {
           </p>
         </div>
         <Button
-          onClick={() => setFormOpen(true)}
+          onClick={() => {
+            setEditingGoal(null);
+            setFormOpen(true);
+          }}
           className="rounded-xl bg-gradient-brand font-semibold"
         >
           <Plus className="size-4" aria-hidden="true" />
@@ -411,7 +429,12 @@ function MetasPage() {
         ) : goals.length === 0 ? (
           <Card className="rounded-3xl border-border/70 shadow-soft">
             <CardContent>
-              <EmptyGoalsState onNewGoal={() => setFormOpen(true)} />
+              <EmptyGoalsState
+                onNewGoal={() => {
+                  setEditingGoal(null);
+                  setFormOpen(true);
+                }}
+              />
             </CardContent>
           </Card>
         ) : filteredGoals.length === 0 ? (
@@ -432,6 +455,10 @@ function MetasPage() {
                 onViewDetails={() =>
                   navigate({ to: "/metas/$goalId", params: { goalId: goal.id } })
                 }
+                onEdit={() => {
+                  setEditingGoal(goal);
+                  setFormOpen(true);
+                }}
                 onArchive={() => setArchivingGoal(goal)}
               />
             ))}
@@ -547,7 +574,14 @@ function MetasPage() {
         <strong>{formatBRL(activeMonthlyRequired)}</strong>
       </p>
 
-      <FinancialGoalFormDialog open={formOpen} onOpenChange={setFormOpen} goal={null} />
+      <FinancialGoalFormDialog
+        open={formOpen}
+        onOpenChange={(open) => {
+          setFormOpen(open);
+          if (!open) setEditingGoal(null);
+        }}
+        goal={editingGoal}
+      />
       <ContributionDialog
         goal={contributionGoal}
         open={Boolean(contributionGoal)}
