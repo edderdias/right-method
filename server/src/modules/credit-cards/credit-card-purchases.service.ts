@@ -6,9 +6,10 @@ import { CategoriesService } from "../categories/categories.service";
 import {
   CreditCardPurchaseNotFoundException,
   CreditCardPurchaseReadOnlyException,
+  InvalidCreditCardPurchaseConfigException,
 } from "../../common/exceptions/app.exception";
 import { addMonthsToDateOnly, parseDateOnly } from "../../common/utils/date-only";
-import { recalculateCardAvailableLimit } from "./credit-card-limit.util";
+import { recalculateCardAvailableLimit, recalculateInvoiceTotal } from "./credit-card-limit.util";
 import { CreditCardInvoicesService } from "./credit-card-invoices.service";
 import type { CreditCard } from "@prisma/client";
 import type { CreateCreditCardPurchaseDto } from "./dto/create-credit-card-purchase.dto";
@@ -74,11 +75,24 @@ export class CreditCardPurchasesService {
     }
 
     const totalInstallments = dto.totalInstallments ?? 1;
+    const isRecurring = dto.isRecurring ?? false;
+    if (isRecurring && totalInstallments > 1) {
+      throw new InvalidCreditCardPurchaseConfigException(
+        "Uma compra não pode ser recorrente e parcelada ao mesmo tempo.",
+      );
+    }
     if (totalInstallments > 1) {
       return this.createInstallments(userId, card, dto, totalInstallments);
     }
 
     const purchaseDate = parseDateOnly(dto.purchaseDate);
+    const recurrenceEndDate = dto.recurrenceEndDate ? parseDateOnly(dto.recurrenceEndDate) : null;
+    if (isRecurring && recurrenceEndDate && recurrenceEndDate <= purchaseDate) {
+      throw new InvalidCreditCardPurchaseConfigException(
+        "A data de término da recorrência deve ser posterior à data da compra.",
+      );
+    }
+
     const created = await this.prisma.$transaction(async (tx) => {
       const invoice = await this.invoicesService.getOrCreateInvoice(tx, {
         userId,
@@ -99,10 +113,12 @@ export class CreditCardPurchasesService {
           responsibleName: normalizeResponsibleName(dto.responsibleName),
           notes: dto.notes,
           source: CardPurchaseSource.MANUAL,
+          isRecurring,
+          recurrenceEndDate: isRecurring ? recurrenceEndDate : null,
         },
         include: PURCHASE_INCLUDE,
       });
-      await this.recalculateInvoiceTotal(tx, invoice.id);
+      await recalculateInvoiceTotal(tx, invoice.id);
       await recalculateCardAvailableLimit(tx, card.id);
       return purchase;
     });
@@ -197,9 +213,7 @@ export class CreditCardPurchasesService {
       select: { responsibleName: true },
       orderBy: { responsibleName: "asc" },
     });
-    return rows
-      .map((row) => row.responsibleName)
-      .filter((name): name is string => name !== null);
+    return rows.map((row) => row.responsibleName).filter((name): name is string => name !== null);
   }
 
   async update(
@@ -213,6 +227,18 @@ export class CreditCardPurchasesService {
       (dto.description !== undefined || dto.purchaseDate !== undefined)
     ) {
       throw new CreditCardPurchaseReadOnlyException();
+    }
+    if (dto.isRecurring === true) {
+      if (existing.source === CardPurchaseSource.OPEN_FINANCE) {
+        throw new CreditCardPurchaseReadOnlyException(
+          "Compras importadas do Open Finance não podem virar compras recorrentes.",
+        );
+      }
+      if (existing.installmentGroupId) {
+        throw new InvalidCreditCardPurchaseConfigException(
+          "Uma compra parcelada não pode virar uma compra recorrente.",
+        );
+      }
     }
     if (dto.categoryId) {
       await this.categoriesService.assertOwnershipOrGlobal(
@@ -229,6 +255,19 @@ export class CreditCardPurchasesService {
       data.responsibleName = normalizeResponsibleName(dto.responsibleName);
     }
     if (dto.notes !== undefined) data.notes = dto.notes;
+    if (dto.isRecurring !== undefined) data.isRecurring = dto.isRecurring;
+    if (dto.recurrenceEndDate !== undefined) {
+      const recurrenceEndDate = dto.recurrenceEndDate ? parseDateOnly(dto.recurrenceEndDate) : null;
+      const referenceDate = dto.purchaseDate
+        ? parseDateOnly(dto.purchaseDate)
+        : existing.purchaseDate;
+      if (recurrenceEndDate && recurrenceEndDate <= referenceDate) {
+        throw new InvalidCreditCardPurchaseConfigException(
+          "A data de término da recorrência deve ser posterior à data da compra.",
+        );
+      }
+      data.recurrenceEndDate = recurrenceEndDate;
+    }
 
     const updated = await this.prisma.$transaction(async (tx) => {
       const invoiceIdsToRecalc = new Set<string>([existing.invoiceId]);
@@ -254,7 +293,7 @@ export class CreditCardPurchasesService {
         include: PURCHASE_INCLUDE,
       });
       for (const invoiceId of invoiceIdsToRecalc) {
-        await this.recalculateInvoiceTotal(tx, invoiceId);
+        await recalculateInvoiceTotal(tx, invoiceId);
       }
       await recalculateCardAvailableLimit(tx, existing.cardId);
       return purchase;
@@ -278,7 +317,7 @@ export class CreditCardPurchasesService {
     await this.prisma.$transaction(async (tx) => {
       await tx.creditCardPurchase.deleteMany({ where: { id: { in: purchaseIds } } });
       for (const invoiceId of invoiceIds) {
-        await this.recalculateInvoiceTotal(tx, invoiceId);
+        await recalculateInvoiceTotal(tx, invoiceId);
       }
       await recalculateCardAvailableLimit(tx, existing.cardId);
     });
@@ -335,27 +374,13 @@ export class CreditCardPurchasesService {
       }
 
       for (const invoiceId of touchedInvoiceIds) {
-        await this.recalculateInvoiceTotal(tx, invoiceId);
+        await recalculateInvoiceTotal(tx, invoiceId);
       }
       await recalculateCardAvailableLimit(tx, card.id);
       return firstPurchase as PurchaseWithRelations;
     });
 
     return this.toPublic(first);
-  }
-
-  private async recalculateInvoiceTotal(
-    tx: Prisma.TransactionClient,
-    invoiceId: string,
-  ): Promise<void> {
-    const agg = await tx.creditCardPurchase.aggregate({
-      where: { invoiceId },
-      _sum: { amount: true },
-    });
-    await tx.creditCardInvoice.update({
-      where: { id: invoiceId },
-      data: { totalAmount: agg._sum.amount ?? 0 },
-    });
   }
 
   private async findOwnedOrThrow(userId: string, id: string): Promise<PurchaseWithRelations> {

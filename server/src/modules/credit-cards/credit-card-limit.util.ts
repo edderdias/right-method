@@ -26,3 +26,20 @@ export async function recalculateCardAvailableLimit(
     data: { availableLimit: new Prisma.Decimal(card.creditLimit).minus(used) },
   });
 }
+
+/** Recomputes an invoice's `totalAmount` as the sum of its purchases. Shared by every write path
+ * that adds/removes/moves a purchase (manual create/update/delete and the recurring-purchase scan)
+ * so the invoice total never drifts from its purchases. */
+export async function recalculateInvoiceTotal(
+  tx: Prisma.TransactionClient,
+  invoiceId: string,
+): Promise<void> {
+  const agg = await tx.creditCardPurchase.aggregate({
+    where: { invoiceId },
+    _sum: { amount: true },
+  });
+  await tx.creditCardInvoice.update({
+    where: { id: invoiceId },
+    data: { totalAmount: agg._sum.amount ?? 0 },
+  });
+}

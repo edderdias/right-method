@@ -1,8 +1,8 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Loader2 } from "lucide-react";
+import { Loader2, Plus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { NewCategoryDialog } from "@/components/new-category-dialog";
 import { useExpenseCategories } from "@/hooks/use-expenses";
 import {
   useCardResponsibleSuggestions,
@@ -56,11 +57,27 @@ const purchaseFormSchema = z
     notes: z.string().max(500).optional(),
     isInstallment: z.boolean(),
     totalInstallments: z.number().int().min(2).max(48).optional(),
+    isRecurring: z.boolean(),
+    recurrenceEndDate: z.date().optional(),
   })
   .refine((values) => !values.isInstallment || Boolean(values.totalInstallments), {
     message: "Informe a quantidade de parcelas.",
     path: ["totalInstallments"],
-  });
+  })
+  .refine((values) => !(values.isInstallment && values.isRecurring), {
+    message: "Uma compra não pode ser parcelada e recorrente ao mesmo tempo.",
+    path: ["isRecurring"],
+  })
+  .refine(
+    (values) =>
+      !values.isRecurring ||
+      !values.recurrenceEndDate ||
+      values.recurrenceEndDate > values.purchaseDate,
+    {
+      message: "A data de término deve ser posterior à data da compra.",
+      path: ["recurrenceEndDate"],
+    },
+  );
 
 type PurchaseFormValues = z.infer<typeof purchaseFormSchema>;
 
@@ -75,6 +92,8 @@ function toFormDefaults(purchase: CreditCardPurchase | null): PurchaseFormValues
       notes: "",
       isInstallment: false,
       totalInstallments: undefined,
+      isRecurring: false,
+      recurrenceEndDate: undefined,
     };
   }
   return {
@@ -86,6 +105,10 @@ function toFormDefaults(purchase: CreditCardPurchase | null): PurchaseFormValues
     notes: purchase.notes ?? "",
     isInstallment: false,
     totalInstallments: undefined,
+    isRecurring: purchase.isRecurring,
+    recurrenceEndDate: purchase.recurrenceEndDate
+      ? parseISODateToLocalDate(purchase.recurrenceEndDate)
+      : undefined,
   };
 }
 
@@ -111,7 +134,9 @@ export function PurchaseFormDialog({
   const familyAccess = useFamilyAccess();
   const isEditing = Boolean(purchase);
   const isReadOnly = purchase?.source === "OPEN_FINANCE";
+  const canToggleRecurrence = !isReadOnly && !purchase?.installmentGroupId;
   const submitting = createPurchase.isPending || updatePurchase.isPending;
+  const [isNewCategoryOpen, setIsNewCategoryOpen] = useState(false);
 
   const responsibleListId = `responsible-options-${cardId}`;
   const responsibleOptions = useMemo(() => {
@@ -132,6 +157,7 @@ export function PurchaseFormDialog({
     defaultValues: toFormDefaults(purchase),
   });
   const isInstallment = form.watch("isInstallment");
+  const isRecurring = form.watch("isRecurring");
 
   useEffect(() => {
     if (open) {
@@ -159,6 +185,15 @@ export function PurchaseFormDialog({
                 categoryId: values.categoryId ?? null,
                 responsibleName: trimmedResponsible || null,
                 ...notes,
+                ...(canToggleRecurrence
+                  ? {
+                      isRecurring: values.isRecurring,
+                      recurrenceEndDate:
+                        values.isRecurring && values.recurrenceEndDate
+                          ? toISODateString(values.recurrenceEndDate)
+                          : null,
+                    }
+                  : {}),
               },
         },
         { onSuccess: () => onOpenChange(false) },
@@ -179,6 +214,14 @@ export function PurchaseFormDialog({
           ...(values.isInstallment && values.totalInstallments
             ? { totalInstallments: values.totalInstallments }
             : {}),
+          ...(values.isRecurring
+            ? {
+                isRecurring: true,
+                ...(values.recurrenceEndDate
+                  ? { recurrenceEndDate: toISODateString(values.recurrenceEndDate) }
+                  : {}),
+              }
+            : {}),
         },
       },
       { onSuccess: () => onOpenChange(false) },
@@ -186,208 +229,324 @@ export function PurchaseFormDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Editar compra" : "Nova compra"}</DialogTitle>
-          <DialogDescription>
-            {isReadOnly
-              ? "Compra importada via Open Finance — apenas categoria e observação podem ser alteradas."
-              : isEditing
-                ? "Atualize os dados da compra."
-                : "Lance uma compra à vista ou parcelada neste cartão."}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{isEditing ? "Editar compra" : "Nova compra"}</DialogTitle>
+            <DialogDescription>
+              {isReadOnly
+                ? "Compra importada via Open Finance — apenas categoria e observação podem ser alteradas."
+                : isEditing
+                  ? "Atualize os dados da compra."
+                  : "Lance uma compra à vista, parcelada ou recorrente neste cartão."}
+            </DialogDescription>
+          </DialogHeader>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descrição</FormLabel>
-                  <FormControl>
-                    <Input
-                      placeholder="Supermercado, Netflix..."
-                      disabled={isReadOnly}
-                      {...field}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <div className="grid gap-4 sm:grid-cols-2">
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
               <FormField
                 control={form.control}
-                name="amount"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Valor</FormLabel>
+                    <FormLabel>Descrição</FormLabel>
                     <FormControl>
-                      <MoneyInput
-                        value={field.value}
-                        onChange={field.onChange}
-                        disabled={isEditing}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="purchaseDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Data da compra</FormLabel>
-                    <FormControl>
-                      <DatePicker
-                        value={field.value}
-                        onChange={field.onChange}
+                      <Input
+                        placeholder="Supermercado, Netflix..."
                         disabled={isReadOnly}
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-            </div>
 
-            <FormField
-              control={form.control}
-              name="categoryId"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoria</FormLabel>
-                  <Select value={field.value ?? ""} onValueChange={field.onChange}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {(categoriesQuery.data ?? []).map((category) => (
-                        <SelectItem key={category.id} value={category.id}>
-                          {category.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="responsibleName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Responsável pela compra</FormLabel>
-                  <FormControl>
-                    <Input
-                      list={responsibleListId}
-                      placeholder="Quem fez a compra? (opcional)"
-                      autoComplete="off"
-                      {...field}
-                      value={field.value ?? ""}
-                    />
-                  </FormControl>
-                  <datalist id={responsibleListId}>
-                    {responsibleOptions.map((name) => (
-                      <option key={name} value={name} />
-                    ))}
-                  </datalist>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            {!isEditing && (
-              <>
+              <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
-                  name="isInstallment"
+                  name="amount"
                   render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border border-input p-3">
-                      <FormLabel className="cursor-pointer">Compra parcelada</FormLabel>
+                    <FormItem>
+                      <FormLabel>Valor</FormLabel>
                       <FormControl>
-                        <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        <MoneyInput
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isEditing}
+                        />
                       </FormControl>
+                      <FormMessage />
                     </FormItem>
                   )}
                 />
+                <FormField
+                  control={form.control}
+                  name="purchaseDate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Data da compra</FormLabel>
+                      <FormControl>
+                        <DatePicker
+                          value={field.value}
+                          onChange={field.onChange}
+                          disabled={isReadOnly}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-                {isInstallment && (
+              <FormField
+                control={form.control}
+                name="categoryId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Categoria</FormLabel>
+                    <div className="flex gap-2">
+                      <Select value={field.value ?? ""} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {(categoriesQuery.data ?? []).map((category) => (
+                            <SelectItem key={category.id} value={category.id}>
+                              {category.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        className="shrink-0"
+                        onClick={() => setIsNewCategoryOpen(true)}
+                        aria-label="Nova categoria"
+                      >
+                        <Plus className="size-4" aria-hidden="true" />
+                      </Button>
+                    </div>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="responsibleName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Responsável pela compra</FormLabel>
+                    <FormControl>
+                      <Input
+                        list={responsibleListId}
+                        placeholder="Quem fez a compra? (opcional)"
+                        autoComplete="off"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <datalist id={responsibleListId}>
+                      {responsibleOptions.map((name) => (
+                        <option key={name} value={name} />
+                      ))}
+                    </datalist>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {!isEditing && (
+                <>
                   <FormField
                     control={form.control}
-                    name="totalInstallments"
+                    name="isInstallment"
                     render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Quantidade de parcelas</FormLabel>
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border border-input p-3">
+                        <FormLabel className="cursor-pointer">Compra parcelada</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            min={2}
-                            max={48}
-                            value={field.value ?? ""}
-                            onChange={(event) =>
-                              field.onChange(Number(event.target.value) || undefined)
-                            }
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                              field.onChange(checked);
+                              if (checked) form.setValue("isRecurring", false);
+                            }}
                           />
                         </FormControl>
-                        <FormMessage />
                       </FormItem>
                     )}
                   />
-                )}
-              </>
-            )}
 
-            <FormField
-              control={form.control}
-              name="notes"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Observações</FormLabel>
-                  <FormControl>
-                    <Textarea placeholder="Opcional" rows={3} {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
+                  {isInstallment && (
+                    <FormField
+                      control={form.control}
+                      name="totalInstallments"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantidade de parcelas</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="number"
+                              min={2}
+                              max={48}
+                              value={field.value ?? ""}
+                              onChange={(event) =>
+                                field.onChange(Number(event.target.value) || undefined)
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  <FormField
+                    control={form.control}
+                    name="isRecurring"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border border-input p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="cursor-pointer">Compra recorrente</FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            Lançada automaticamente todo mês até você informar o fim.
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                              field.onChange(checked);
+                              if (checked) {
+                                form.setValue("isInstallment", false);
+                                form.setValue("totalInstallments", undefined);
+                              }
+                            }}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  {isRecurring && (
+                    <FormField
+                      control={form.control}
+                      name="recurrenceEndDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Repetir até (opcional)</FormLabel>
+                          <FormControl>
+                            <DatePicker value={field.value} onChange={field.onChange} />
+                          </FormControl>
+                          <p className="text-sm text-muted-foreground">
+                            Deixe em branco para repetir sem prazo definido.
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </>
               )}
-            />
 
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onOpenChange(false)}
-                disabled={submitting}
-              >
-                Cancelar
-              </Button>
-              <Button
-                type="submit"
-                disabled={submitting}
-                className="bg-gradient-brand font-semibold"
-              >
-                {submitting ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-                    Salvando...
-                  </>
-                ) : (
-                  "Salvar compra"
+              {isEditing && canToggleRecurrence && (
+                <>
+                  <FormField
+                    control={form.control}
+                    name="isRecurring"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border border-input p-3">
+                        <div className="space-y-0.5">
+                          <FormLabel className="cursor-pointer">Compra recorrente</FormLabel>
+                          <p className="text-sm text-muted-foreground">
+                            {field.value
+                              ? "Desative para parar de lançar esta compra nos próximos meses."
+                              : "Volte a lançar esta compra automaticamente todo mês."}
+                          </p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  {isRecurring && (
+                    <FormField
+                      control={form.control}
+                      name="recurrenceEndDate"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Repetir até (opcional)</FormLabel>
+                          <FormControl>
+                            <DatePicker value={field.value} onChange={field.onChange} />
+                          </FormControl>
+                          <p className="text-sm text-muted-foreground">
+                            Deixe em branco para repetir sem prazo definido.
+                          </p>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+                </>
+              )}
+
+              <FormField
+                control={form.control}
+                name="notes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Observações</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Opcional" rows={3} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )}
-              </Button>
-            </DialogFooter>
-          </form>
-        </Form>
-      </DialogContent>
-    </Dialog>
+              />
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => onOpenChange(false)}
+                  disabled={submitting}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submitting}
+                  className="bg-gradient-brand font-semibold"
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                      Salvando...
+                    </>
+                  ) : (
+                    "Salvar compra"
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          </Form>
+        </DialogContent>
+      </Dialog>
+
+      <NewCategoryDialog
+        open={isNewCategoryOpen}
+        onOpenChange={setIsNewCategoryOpen}
+        type="EXPENSE"
+        onCreated={(category) => form.setValue("categoryId", category.id, { shouldValidate: true })}
+      />
+    </>
   );
 }

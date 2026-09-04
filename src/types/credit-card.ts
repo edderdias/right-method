@@ -50,6 +50,9 @@ export interface CreditCardPurchase {
   installmentNumber: number | null;
   installmentTotal: number | null;
   notes: string | null;
+  isRecurring: boolean;
+  recurrenceEndDate: string | null;
+  parentPurchaseId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -122,6 +125,8 @@ export interface CreatePurchaseInput {
   categoryId?: string;
   responsibleName?: string;
   totalInstallments?: number;
+  isRecurring?: boolean;
+  recurrenceEndDate?: string;
   notes?: string;
 }
 
@@ -131,6 +136,8 @@ export interface UpdatePurchaseInput {
   categoryId?: string | null;
   responsibleName?: string | null;
   notes?: string;
+  isRecurring?: boolean;
+  recurrenceEndDate?: string | null;
 }
 
 export type RemovePurchaseScope = "one" | "group";

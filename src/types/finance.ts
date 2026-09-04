@@ -21,6 +21,11 @@ export interface Category {
   createdAt: string;
 }
 
+export interface CreateCategoryInput {
+  name: string;
+  type: CategoryType;
+}
+
 export interface Revenue {
   id: string;
   description: string;

@@ -2,6 +2,7 @@ import { CardPurchaseSource, CreditCardSource, Prisma } from "@prisma/client";
 import {
   CreditCardPurchaseNotFoundException,
   CreditCardPurchaseReadOnlyException,
+  InvalidCreditCardPurchaseConfigException,
 } from "../../common/exceptions/app.exception";
 import { CreditCardInvoicesService } from "./credit-card-invoices.service";
 import { CreditCardPurchasesService } from "./credit-card-purchases.service";
@@ -73,6 +74,9 @@ function buildPurchase(overrides: Record<string, unknown> = {}) {
     installmentNumber: null,
     installmentTotal: null,
     notes: null,
+    isRecurring: false,
+    recurrenceEndDate: null,
+    parentPurchaseId: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     category: null,
@@ -169,7 +173,9 @@ describe("CreditCardPurchasesService", () => {
 
       await service.list("user-1", "card-1", { responsibleName: "João" } as any);
 
-      expect(prisma.creditCardPurchase.findMany.mock.calls[0][0].where.responsibleName).toBe("João");
+      expect(prisma.creditCardPurchase.findMany.mock.calls[0][0].where.responsibleName).toBe(
+        "João",
+      );
     });
   });
 
@@ -227,6 +233,88 @@ describe("CreditCardPurchasesService", () => {
       );
       expect(invoiceIds).toEqual(["inv-2026-08", "inv-2026-09", "inv-2026-10"]);
       expect(result.installmentNumber).toBe(1);
+    });
+  });
+
+  describe("create — recurring purchases", () => {
+    it("persists isRecurring and recurrenceEndDate", async () => {
+      prisma.creditCardPurchase.create.mockImplementation(({ data }: any) =>
+        Promise.resolve(buildPurchase({ ...data })),
+      );
+
+      await service.create("user-1", buildCard(), {
+        description: "Netflix",
+        amount: 55,
+        purchaseDate: "2026-08-05",
+        isRecurring: true,
+        recurrenceEndDate: "2027-08-05",
+      } as any);
+
+      const data = prisma.creditCardPurchase.create.mock.calls[0][0].data;
+      expect(data.isRecurring).toBe(true);
+      expect(data.recurrenceEndDate).toEqual(new Date("2027-08-05T00:00:00.000Z"));
+    });
+
+    it("rejects a purchase that is both recurring and installment", async () => {
+      await expect(
+        service.create("user-1", buildCard(), {
+          description: "Notebook",
+          amount: 900,
+          purchaseDate: "2026-08-05",
+          isRecurring: true,
+          totalInstallments: 3,
+        } as any),
+      ).rejects.toBeInstanceOf(InvalidCreditCardPurchaseConfigException);
+      expect(prisma.creditCardPurchase.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a recurrenceEndDate on/before the purchase date", async () => {
+      await expect(
+        service.create("user-1", buildCard(), {
+          description: "Netflix",
+          amount: 55,
+          purchaseDate: "2026-08-05",
+          isRecurring: true,
+          recurrenceEndDate: "2026-08-05",
+        } as any),
+      ).rejects.toBeInstanceOf(InvalidCreditCardPurchaseConfigException);
+      expect(prisma.creditCardPurchase.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("update — recurring purchases", () => {
+    it("stops the recurrence by setting isRecurring to false", async () => {
+      const existing = buildPurchase({ isRecurring: true });
+      prisma.creditCardPurchase.findFirst.mockResolvedValue(existing);
+      prisma.creditCardPurchase.update.mockResolvedValue({ ...existing, isRecurring: false });
+
+      await service.update("user-1", "purchase-1", { isRecurring: false } as any);
+
+      expect(prisma.creditCardPurchase.update).toHaveBeenCalledWith(
+        expect.objectContaining({ data: expect.objectContaining({ isRecurring: false }) }),
+      );
+    });
+
+    it("rejects turning an OPEN_FINANCE purchase recurring", async () => {
+      prisma.creditCardPurchase.findFirst.mockResolvedValue(
+        buildPurchase({ source: CardPurchaseSource.OPEN_FINANCE }),
+      );
+
+      await expect(
+        service.update("user-1", "purchase-1", { isRecurring: true } as any),
+      ).rejects.toBeInstanceOf(CreditCardPurchaseReadOnlyException);
+      expect(prisma.creditCardPurchase.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects turning an installment purchase recurring", async () => {
+      prisma.creditCardPurchase.findFirst.mockResolvedValue(
+        buildPurchase({ installmentGroupId: "group-1" }),
+      );
+
+      await expect(
+        service.update("user-1", "purchase-1", { isRecurring: true } as any),
+      ).rejects.toBeInstanceOf(InvalidCreditCardPurchaseConfigException);
+      expect(prisma.creditCardPurchase.update).not.toHaveBeenCalled();
     });
   });
 
