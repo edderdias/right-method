@@ -2,7 +2,11 @@ import { Injectable } from "@nestjs/common";
 import type { Category } from "@prisma/client";
 import { CategoryType } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
-import { CategoryNotFoundException } from "../../common/exceptions/app.exception";
+import {
+  CategoryAlreadyExistsException,
+  CategoryNotFoundException,
+} from "../../common/exceptions/app.exception";
+import type { CreateCategoryDto } from "./dto/create-category.dto";
 
 @Injectable()
 export class CategoriesService {
@@ -13,6 +17,23 @@ export class CategoriesService {
       where: { type, OR: [{ userId: null }, { userId }] },
       orderBy: { name: "asc" },
     });
+  }
+
+  /** Creates a category owned by the user, visible only to them alongside the global ones. Rejects
+   * a name that already exists (global or the user's own) for the same type, case-insensitively. */
+  async create(userId: string, dto: CreateCategoryDto): Promise<Category> {
+    const name = dto.name.trim();
+    const existing = await this.prisma.category.findFirst({
+      where: {
+        type: dto.type,
+        name: { equals: name, mode: "insensitive" },
+        OR: [{ userId: null }, { userId }],
+      },
+    });
+    if (existing) {
+      throw new CategoryAlreadyExistsException();
+    }
+    return this.prisma.category.create({ data: { userId, name, type: dto.type } });
   }
 
   async assertOwnershipOrGlobal(

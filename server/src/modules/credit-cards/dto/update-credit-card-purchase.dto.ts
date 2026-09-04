@@ -1,5 +1,13 @@
 import { ApiPropertyOptional } from "@nestjs/swagger";
-import { IsDateString, IsOptional, IsString, IsUUID, MaxLength, MinLength } from "class-validator";
+import {
+  IsBoolean,
+  IsDateString,
+  IsOptional,
+  IsString,
+  IsUUID,
+  MaxLength,
+  MinLength,
+} from "class-validator";
 
 /**
  * Applies to both MANUAL and OPEN_FINANCE purchases. The service enforces that OPEN_FINANCE
@@ -35,4 +43,19 @@ export class UpdateCreditCardPurchaseDto {
   @IsString()
   @MaxLength(500)
   notes?: string;
+
+  @ApiPropertyOptional({
+    description: "Defina como false para parar a recorrência — nenhuma nova ocorrência será lançada.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  isRecurring?: boolean;
+
+  @ApiPropertyOptional({
+    nullable: true,
+    description: "Data em que a recorrência deve parar (null limpa, repetindo sem prazo definido).",
+  })
+  @IsOptional()
+  @IsDateString()
+  recurrenceEndDate?: string | null;
 }

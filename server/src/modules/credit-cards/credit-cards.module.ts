@@ -6,11 +6,17 @@ import { CreditCardPurchasesController } from "./credit-card-purchases.controlle
 import { CreditCardsService } from "./credit-cards.service";
 import { CreditCardPurchasesService } from "./credit-card-purchases.service";
 import { CreditCardInvoicesService } from "./credit-card-invoices.service";
+import { CreditCardRecurringPurchasesService } from "./credit-card-recurring-purchases.service";
 
 @Module({
   imports: [AccountsModule, CategoriesModule],
   controllers: [CreditCardsController, CreditCardPurchasesController],
-  providers: [CreditCardsService, CreditCardPurchasesService, CreditCardInvoicesService],
+  providers: [
+    CreditCardsService,
+    CreditCardPurchasesService,
+    CreditCardInvoicesService,
+    CreditCardRecurringPurchasesService,
+  ],
   exports: [CreditCardsService],
 })
 export class CreditCardsModule {}

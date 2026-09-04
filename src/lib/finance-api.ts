@@ -5,6 +5,7 @@ import type {
   AccountTransfer,
   Category,
   CreateAccountInput,
+  CreateCategoryInput,
   CreateExpenseInput,
   CreateRevenueInput,
   CreateTransferInput,
@@ -95,10 +96,9 @@ export async function deleteAccountTransfer(id: string): Promise<void> {
 export async function getAccountsSummary(
   period: DashboardPeriodParams = {},
 ): Promise<AccountsPeriodSummary> {
-  const { data } = await apiGet<ApiEnvelope<AccountsPeriodSummary>>(
-    "/dashboard/accounts-summary",
-    { ...period },
-  );
+  const { data } = await apiGet<ApiEnvelope<AccountsPeriodSummary>>("/dashboard/accounts-summary", {
+    ...period,
+  });
   return data;
 }
 
@@ -143,6 +143,11 @@ export async function deleteExpense(id: string): Promise<void> {
 
 export async function listExpenseCategories(): Promise<Category[]> {
   const { data } = await apiGet<ApiEnvelope<Category[]>>("/categories", { type: "EXPENSE" });
+  return data;
+}
+
+export async function createCategory(input: CreateCategoryInput): Promise<Category> {
+  const { data } = await apiPost<ApiEnvelope<Category>>("/categories", input);
   return data;
 }
 

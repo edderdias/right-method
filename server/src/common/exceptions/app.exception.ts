@@ -242,6 +242,18 @@ export class CreditCardInvoiceAlreadyPaidException extends AppException {
   }
 }
 
+export class InvalidCreditCardPurchaseConfigException extends AppException {
+  constructor(message = "Configuração de compra inválida.") {
+    super("INVALID_CREDIT_CARD_PURCHASE_CONFIG", message, HttpStatus.UNPROCESSABLE_ENTITY);
+  }
+}
+
+export class CategoryAlreadyExistsException extends AppException {
+  constructor() {
+    super("CATEGORY_ALREADY_EXISTS", "Já existe uma categoria com este nome.", HttpStatus.CONFLICT);
+  }
+}
+
 export class InvestmentNotFoundException extends AppException {
   constructor() {
     super("INVESTMENT_NOT_FOUND", "Investimento não encontrado.", HttpStatus.NOT_FOUND);

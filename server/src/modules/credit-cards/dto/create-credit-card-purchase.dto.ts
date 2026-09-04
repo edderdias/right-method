@@ -1,6 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Type } from "class-transformer";
 import {
+  IsBoolean,
   IsDateString,
   IsInt,
   IsNumber,
@@ -49,6 +50,22 @@ export class CreateCreditCardPurchaseDto {
   @Min(2)
   @Max(48)
   totalInstallments?: number;
+
+  @ApiPropertyOptional({
+    description:
+      "Compra recorrente: lançada automaticamente todo mês até a data de término informada (ou indefinidamente, se não informada). Não pode ser combinada com parcelamento.",
+  })
+  @IsOptional()
+  @IsBoolean()
+  isRecurring?: boolean;
+
+  @ApiPropertyOptional({
+    example: "2027-08-10",
+    description: "Data em que a recorrência deve parar. Deixe em branco para repetir sem prazo definido.",
+  })
+  @IsOptional()
+  @IsDateString()
+  recurrenceEndDate?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
