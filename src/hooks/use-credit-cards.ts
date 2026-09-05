@@ -18,6 +18,7 @@ import {
   payCreditCardInvoice,
   removeCreditCard,
   removeCreditCardPurchase,
+  reverseCreditCardInvoicePayment,
   syncOpenFinanceCreditCard,
   updateCreditCard,
   updateCreditCardPurchase,
@@ -29,6 +30,7 @@ import type {
   PayInvoiceInput,
   RemovePurchaseScope,
   ResponsiblesSummaryFilters,
+  ReverseInvoicePaymentInput,
   UpdateCreditCardInput,
   UpdatePurchaseInput,
 } from "@/types/credit-card";
@@ -249,6 +251,32 @@ export function usePayInvoice() {
     }) => payCreditCardInvoice(cardId, invoiceId, input),
     onSuccess: (_invoice, variables) => {
       toast.success("Fatura paga com sucesso!");
+      void queryClient.invalidateQueries({
+        queryKey: ["credit-cards", variables.cardId, "invoices"],
+      });
+      void queryClient.invalidateQueries({ queryKey: ["accounts"] });
+      void queryClient.invalidateQueries({ queryKey: ["expenses"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      invalidateCardAndSummary(queryClient, variables.cardId);
+    },
+    onError: (error) => toast.error(toErrorMessage(error)),
+  });
+}
+
+export function useReverseInvoicePayment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      cardId,
+      invoiceId,
+      input,
+    }: {
+      cardId: string;
+      invoiceId: string;
+      input: ReverseInvoicePaymentInput;
+    }) => reverseCreditCardInvoicePayment(cardId, invoiceId, input),
+    onSuccess: (_invoice, variables) => {
+      toast.success("Pagamento estornado com sucesso!");
       void queryClient.invalidateQueries({
         queryKey: ["credit-cards", variables.cardId, "invoices"],
       });

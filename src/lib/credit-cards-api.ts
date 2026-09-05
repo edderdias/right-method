@@ -11,6 +11,7 @@ import type {
   CreatePurchaseInput,
   PayInvoiceInput,
   RemovePurchaseScope,
+  ReverseInvoicePaymentInput,
   ResponsibleSummary,
   ResponsiblesSummaryFilters,
   UpdateCreditCardInput,
@@ -137,6 +138,18 @@ export async function payCreditCardInvoice(
 ): Promise<CreditCardInvoice> {
   const { data } = await apiPost<ApiEnvelope<CreditCardInvoice>>(
     `/credit-cards/${cardId}/invoices/${invoiceId}/pay`,
+    input,
+  );
+  return data;
+}
+
+export async function reverseCreditCardInvoicePayment(
+  cardId: string,
+  invoiceId: string,
+  input: ReverseInvoicePaymentInput,
+): Promise<CreditCardInvoice> {
+  const { data } = await apiPost<ApiEnvelope<CreditCardInvoice>>(
+    `/credit-cards/${cardId}/invoices/${invoiceId}/reverse-payment`,
     input,
   );
   return data;

@@ -99,6 +99,9 @@ export interface CreditCardInvoice {
   status: CreditCardInvoiceStatus;
   paidAt: string | null;
   paidFromAccountId: string | null;
+  reversedAt: string | null;
+  reversalReason: string | null;
+  canReverse: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -145,6 +148,10 @@ export type RemovePurchaseScope = "one" | "group";
 export interface PayInvoiceInput {
   accountId: string;
   paidAt?: string;
+}
+
+export interface ReverseInvoicePaymentInput {
+  reason: string;
 }
 
 export type AvailableOpenFinanceCreditCard = AvailablePluggyAccount;

@@ -11,15 +11,19 @@ import { AccountsService } from "../accounts/accounts.service";
 import {
   CreditCardInvoiceAlreadyPaidException,
   CreditCardInvoiceNotFoundException,
+  CreditCardInvoiceNotPaidException,
+  CreditCardInvoiceReversalExpiredException,
 } from "../../common/exceptions/app.exception";
 import {
   addMonthsToDateOnly,
   formatDateOnly,
   parseDateOnly,
+  startOfMonth,
   startOfTodaySaoPaulo,
 } from "../../common/utils/date-only";
 import { recalculateCardAvailableLimit } from "./credit-card-limit.util";
 import type { PayInvoiceDto } from "./dto/pay-invoice.dto";
+import type { ReverseInvoicePaymentDto } from "./dto/reverse-invoice-payment.dto";
 
 export interface InvoiceCycle {
   referenceMonth: Date;
@@ -30,6 +34,7 @@ export interface InvoiceCycle {
 export type PublicInvoice = Omit<CreditCardInvoice, "totalAmount" | "paidAmount"> & {
   totalAmount: number;
   paidAmount: number;
+  canReverse: boolean;
 };
 
 const DEFAULT_CLOSING_DAY = 1;
@@ -101,12 +106,21 @@ export class CreditCardInvoicesService {
     });
   }
 
+  /** Faturas do mês corrente em diante, mais qualquer fatura paga ainda dentro da janela de
+   * estorno (para que o estorno continue acessível mesmo depois de virar "mês anterior"). */
   async list(userId: string, cardId: string): Promise<PublicInvoice[]> {
     const invoices = await this.prisma.creditCardInvoice.findMany({
       where: { userId, cardId },
       orderBy: { referenceMonth: "desc" },
     });
-    return invoices.map((invoice) => this.toPublic(this.decorateStatus(invoice)));
+    const today = startOfTodaySaoPaulo();
+    const currentMonthStart = startOfMonth(today);
+    return invoices
+      .filter(
+        (invoice) =>
+          invoice.referenceMonth >= currentMonthStart || this.canReversePayment(invoice, today),
+      )
+      .map((invoice) => this.toPublic(this.decorateStatus(invoice)));
   }
 
   async findOne(userId: string, id: string) {
@@ -177,6 +191,55 @@ export class CreditCardInvoicesService {
     return this.toPublic(updated);
   }
 
+  /** Estorna o pagamento de uma fatura: devolve o valor à conta debitada, remove a despesa gerada
+   * pelo pagamento e reabre a fatura. Só é permitido dentro da janela de estorno (spec: até a
+   * fatura do mês seguinte fechar). */
+  async reversePayment(
+    userId: string,
+    invoiceId: string,
+    dto: ReverseInvoicePaymentDto,
+  ): Promise<PublicInvoice> {
+    const invoice = await this.findOwnedOrThrow(userId, invoiceId);
+    if (invoice.status !== CreditCardInvoiceStatus.PAID) {
+      throw new CreditCardInvoiceNotPaidException();
+    }
+    if (!this.canReversePayment(invoice, startOfTodaySaoPaulo())) {
+      throw new CreditCardInvoiceReversalExpiredException();
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      if (invoice.paidFromAccountId) {
+        await tx.account.update({
+          where: { id: invoice.paidFromAccountId },
+          data: { balance: { increment: invoice.paidAmount } },
+        });
+      }
+      // The expense was created directly by pay() without debiting the account again (see comment
+      // there), so it's removed directly here too — going through ExpensesService.remove() would
+      // credit the account a second time.
+      if (invoice.paidExpenseId) {
+        await tx.expense.deleteMany({ where: { id: invoice.paidExpenseId } });
+      }
+
+      const reversed = await tx.creditCardInvoice.update({
+        where: { id: invoiceId },
+        data: {
+          status: CreditCardInvoiceStatus.OPEN,
+          paidAmount: 0,
+          paidAt: null,
+          paidFromAccountId: null,
+          paidExpenseId: null,
+          reversedAt: startOfTodaySaoPaulo(),
+          reversalReason: dto.reason,
+        },
+      });
+      await recalculateCardAvailableLimit(tx, invoice.cardId);
+      return reversed;
+    });
+
+    return this.toPublic(this.decorateStatus(updated));
+  }
+
   /** Finds the global "Cartão de crédito" expense category (seeded by migration), falling back to
    * a per-user one, creating it on demand if neither exists. */
   private async resolveCardExpenseCategoryId(
@@ -218,11 +281,20 @@ export class CreditCardInvoicesService {
     return { ...invoice, status: CreditCardInvoiceStatus.OPEN };
   }
 
+  /** A paid invoice can be reversed only until the following month's invoice would close — same
+   * cycle length as the card's own closing day, one month ahead of this invoice's closing date. */
+  private canReversePayment(invoice: CreditCardInvoice, today: Date): boolean {
+    if (invoice.status !== CreditCardInvoiceStatus.PAID) return false;
+    const deadline = addMonthsToDateOnly(invoice.closingDate, 1);
+    return today < deadline;
+  }
+
   private toPublic(invoice: CreditCardInvoice): PublicInvoice {
     return {
       ...invoice,
       totalAmount: Number(invoice.totalAmount),
       paidAmount: Number(invoice.paidAmount),
+      canReverse: this.canReversePayment(invoice, startOfTodaySaoPaulo()),
     };
   }
 }

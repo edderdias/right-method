@@ -657,6 +657,8 @@ model CreditCardInvoice {
   paidAt            DateTime?
   paidFromAccountId String?
   paidExpenseId     String?
+  reversedAt        DateTime?
+  reversalReason    String?
   createdAt         DateTime                @default(now())
   updatedAt         DateTime                @updatedAt
 

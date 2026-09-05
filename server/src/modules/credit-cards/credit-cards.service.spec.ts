@@ -1,6 +1,8 @@
 import { CreditCardSource, CreditCardStatus, Prisma } from "@prisma/client";
 import {
   CreditCardArchivedException,
+  CreditCardHasFuturePurchaseException,
+  CreditCardHasOpenInvoiceException,
   CreditCardNotFoundException,
   CreditCardReadOnlyException,
 } from "../../common/exceptions/app.exception";
@@ -105,10 +107,28 @@ describe("CreditCardsService", () => {
   });
 
   describe("archiveOrDelete", () => {
+    /** The service issues two `count()` calls each for invoices/purchases: one filtered (open
+     * invoices / future purchases, used by the new deletion guard) and one unfiltered (used to
+     * decide archive vs. hard-delete). Distinguishes them by whether `where` carries the filter. */
+    function mockCounts(prisma: any, counts: {
+      openInvoices?: number;
+      futurePurchases?: number;
+      totalInvoices?: number;
+      totalPurchases?: number;
+    }) {
+      prisma.creditCardInvoice.count.mockImplementation((args: any) =>
+        Promise.resolve(args?.where?.status ? (counts.openInvoices ?? 0) : (counts.totalInvoices ?? 0)),
+      );
+      prisma.creditCardPurchase.count.mockImplementation((args: any) =>
+        Promise.resolve(
+          args?.where?.purchaseDate ? (counts.futurePurchases ?? 0) : (counts.totalPurchases ?? 0),
+        ),
+      );
+    }
+
     it("hard-deletes a card with no invoices or purchases", async () => {
       prisma.creditCard.findFirst.mockResolvedValue(buildCard());
-      prisma.creditCardInvoice.count.mockResolvedValue(0);
-      prisma.creditCardPurchase.count.mockResolvedValue(0);
+      mockCounts(prisma, {});
 
       const result = await service.archiveOrDelete("user-1", "card-1");
 
@@ -119,8 +139,7 @@ describe("CreditCardsService", () => {
 
     it("archives a card that has invoice/purchase history instead of deleting it", async () => {
       prisma.creditCard.findFirst.mockResolvedValue(buildCard());
-      prisma.creditCardInvoice.count.mockResolvedValue(2);
-      prisma.creditCardPurchase.count.mockResolvedValue(5);
+      mockCounts(prisma, { totalInvoices: 2, totalPurchases: 5 });
 
       const result = await service.archiveOrDelete("user-1", "card-1");
 
@@ -130,6 +149,28 @@ describe("CreditCardsService", () => {
         where: { id: "card-1" },
         data: { status: CreditCardStatus.ARCHIVED },
       });
+    });
+
+    it("rejects deleting a card that has an open (unpaid) invoice", async () => {
+      prisma.creditCard.findFirst.mockResolvedValue(buildCard());
+      mockCounts(prisma, { openInvoices: 1, totalInvoices: 1 });
+
+      await expect(service.archiveOrDelete("user-1", "card-1")).rejects.toBeInstanceOf(
+        CreditCardHasOpenInvoiceException,
+      );
+      expect(prisma.creditCard.delete).not.toHaveBeenCalled();
+      expect(prisma.creditCard.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects deleting a card that has a purchase dated in the future", async () => {
+      prisma.creditCard.findFirst.mockResolvedValue(buildCard());
+      mockCounts(prisma, { futurePurchases: 1, totalPurchases: 1 });
+
+      await expect(service.archiveOrDelete("user-1", "card-1")).rejects.toBeInstanceOf(
+        CreditCardHasFuturePurchaseException,
+      );
+      expect(prisma.creditCard.delete).not.toHaveBeenCalled();
+      expect(prisma.creditCard.update).not.toHaveBeenCalled();
     });
   });
 
