@@ -8,6 +8,7 @@ import {
   RefreshCw,
   ShieldCheck,
   Trash2,
+  Undo2,
   Wifi,
   X,
 } from "lucide-react";
@@ -44,6 +45,7 @@ import { DeletePurchaseDialog } from "@/components/cartoes/delete-purchase-dialo
 import { EditCreditCardDialog } from "@/components/cartoes/edit-credit-card-dialog";
 import { PayInvoiceDialog } from "@/components/cartoes/pay-invoice-dialog";
 import { PurchaseFormDialog } from "@/components/cartoes/purchase-form-dialog";
+import { ReverseInvoicePaymentDialog } from "@/components/cartoes/reverse-invoice-payment-dialog";
 import { useExpenseCategories } from "@/hooks/use-expenses";
 import {
   useCardResponsiblesSummary,
@@ -137,6 +139,7 @@ function CartaoDetailPage() {
   const [responsibleName, setResponsibleName] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [payingInvoice, setPayingInvoice] = useState<CreditCardInvoice | null>(null);
+  const [reversingInvoice, setReversingInvoice] = useState<CreditCardInvoice | null>(null);
   const [editingPurchase, setEditingPurchase] = useState<CreditCardPurchase | null>(null);
   const [deletingPurchase, setDeletingPurchase] = useState<CreditCardPurchase | null>(null);
   const [purchaseDialogOpen, setPurchaseDialogOpen] = useState(false);
@@ -176,8 +179,10 @@ function CartaoDetailPage() {
 
   const card = cardQuery.data;
   const invoices = invoicesQuery.data ?? [];
+  const now = new Date();
+  const currentMonthKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const currentInvoice =
-    invoices.find((invoice) => invoice.status !== "PAID") ?? invoices[0] ?? null;
+    invoices.find((invoice) => invoice.referenceMonth.slice(0, 7) === currentMonthKey) ?? null;
 
   const purchases = purchasesQuery.data?.items ?? [];
   const total = purchasesQuery.data?.total ?? 0;
@@ -327,7 +332,7 @@ function CartaoDetailPage() {
                 {formatShortDate(currentInvoice.dueDate)}
               </p>
             </div>
-            {currentInvoice.status !== "PAID" && (
+            {currentInvoice.status !== "PAID" ? (
               <Button
                 variant="secondary"
                 className="rounded-xl"
@@ -336,6 +341,17 @@ function CartaoDetailPage() {
                 <ShieldCheck className="size-4" aria-hidden="true" />
                 Pagar fatura
               </Button>
+            ) : (
+              currentInvoice.canReverse && (
+                <Button
+                  variant="ghost"
+                  className="rounded-xl text-destructive"
+                  onClick={() => setReversingInvoice(currentInvoice)}
+                >
+                  <Undo2 className="size-4" aria-hidden="true" />
+                  Estornar pagamento
+                </Button>
+              )
             )}
           </CardContent>
         </Card>
@@ -382,9 +398,15 @@ function CartaoDetailPage() {
                       >
                         {INVOICE_STATUS_META[invoice.status].label}
                       </span>
+                      {invoice.reversedAt && (
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Estornada em {formatShortDate(invoice.reversedAt)}
+                          {invoice.reversalReason ? `: ${invoice.reversalReason}` : ""}
+                        </p>
+                      )}
                     </TableCell>
                     <TableCell>
-                      {invoice.status !== "PAID" && (
+                      {invoice.status !== "PAID" ? (
                         <Button
                           variant="ghost"
                           size="sm"
@@ -395,6 +417,20 @@ function CartaoDetailPage() {
                         >
                           Pagar
                         </Button>
+                      ) : (
+                        invoice.canReverse && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:text-destructive"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setReversingInvoice(invoice);
+                            }}
+                          >
+                            Estornar
+                          </Button>
+                        )
                       )}
                     </TableCell>
                   </TableRow>
@@ -699,6 +735,13 @@ function CartaoDetailPage() {
         invoice={payingInvoice}
         onOpenChange={(open) => {
           if (!open) setPayingInvoice(null);
+        }}
+      />
+      <ReverseInvoicePaymentDialog
+        cardId={cardId}
+        invoice={reversingInvoice}
+        onOpenChange={(open) => {
+          if (!open) setReversingInvoice(null);
         }}
       />
       {card && (

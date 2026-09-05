@@ -22,6 +22,7 @@ import { CreateCreditCardPurchaseDto } from "./dto/create-credit-card-purchase.d
 import { ListCreditCardPurchasesQueryDto } from "./dto/list-credit-card-purchases-query.dto";
 import { ResponsiblesSummaryQueryDto } from "./dto/responsibles-summary-query.dto";
 import { PayInvoiceDto } from "./dto/pay-invoice.dto";
+import { ReverseInvoicePaymentDto } from "./dto/reverse-invoice-payment.dto";
 
 @ApiTags("credit-cards")
 @ApiBearerAuth()
@@ -159,5 +160,18 @@ export class CreditCardsController {
     await this.creditCardsService.assertOwnership(user.sub, id);
     const data = await this.invoicesService.pay(user.sub, invoiceId, dto);
     return { message: "Fatura paga com sucesso.", data };
+  }
+
+  @Post(":id/invoices/:invoiceId/reverse-payment")
+  @ApiOperation({ summary: "Estorna o pagamento de uma fatura, registrando o motivo" })
+  async reverseInvoicePayment(
+    @CurrentUser() user: JwtPayload,
+    @Param("id") id: string,
+    @Param("invoiceId") invoiceId: string,
+    @Body() dto: ReverseInvoicePaymentDto,
+  ) {
+    await this.creditCardsService.assertOwnership(user.sub, id);
+    const data = await this.invoicesService.reversePayment(user.sub, invoiceId, dto);
+    return { message: "Pagamento estornado com sucesso.", data };
   }
 }

@@ -42,7 +42,7 @@ import {
 } from "@/hooks/use-credit-cards";
 import { useFamilyAccess, useFamilyMembers } from "@/hooks/use-family";
 import { useCurrentUser } from "@/hooks/use-user-settings";
-import { parseISODateToLocalDate, toISODateString } from "@/lib/finance-format";
+import { formatBRL, parseISODateToLocalDate, toISODateString } from "@/lib/finance-format";
 import type { CreditCardPurchase } from "@/types/credit-card";
 
 const purchaseFormSchema = z
@@ -112,6 +112,20 @@ function toFormDefaults(purchase: CreditCardPurchase | null): PurchaseFormValues
   };
 }
 
+/** Mirrors the backend's split (server/.../credit-card-purchases.service.ts createInstallments):
+ * the total is divided in cents and the last installment absorbs the rounding remainder. */
+function describeInstallments(amount: number, count: number): string {
+  const totalCents = Math.round(amount * 100);
+  const baseCents = Math.floor(totalCents / count);
+  const remainderCents = totalCents - baseCents * count;
+  if (remainderCents === 0) {
+    return `${count}x de ${formatBRL(baseCents / 100)}`;
+  }
+  return `${count - 1}x de ${formatBRL(baseCents / 100)} + 1x de ${formatBRL(
+    (baseCents + remainderCents) / 100,
+  )}`;
+}
+
 interface PurchaseFormDialogProps {
   cardId: string;
   open: boolean;
@@ -158,6 +172,12 @@ export function PurchaseFormDialog({
   });
   const isInstallment = form.watch("isInstallment");
   const isRecurring = form.watch("isRecurring");
+  const amount = form.watch("amount");
+  const totalInstallments = form.watch("totalInstallments");
+  const installmentPreview =
+    isInstallment && amount > 0 && totalInstallments && totalInstallments >= 2
+      ? describeInstallments(amount, totalInstallments)
+      : null;
 
   useEffect(() => {
     if (open) {
@@ -269,7 +289,7 @@ export function PurchaseFormDialog({
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Valor</FormLabel>
+                      <FormLabel>{isInstallment ? "Valor total da compra" : "Valor"}</FormLabel>
                       <FormControl>
                         <MoneyInput
                           value={field.value}
@@ -402,6 +422,11 @@ export function PurchaseFormDialog({
                             />
                           </FormControl>
                           <FormMessage />
+                          {installmentPreview && (
+                            <p className="text-sm text-muted-foreground">
+                              {installmentPreview} (total {formatBRL(amount)})
+                            </p>
+                          )}
                         </FormItem>
                       )}
                     />

@@ -242,6 +242,46 @@ export class CreditCardInvoiceAlreadyPaidException extends AppException {
   }
 }
 
+export class CreditCardInvoiceNotPaidException extends AppException {
+  constructor() {
+    super(
+      "CREDIT_CARD_INVOICE_NOT_PAID",
+      "Esta fatura ainda não foi paga.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class CreditCardInvoiceReversalExpiredException extends AppException {
+  constructor() {
+    super(
+      "CREDIT_CARD_INVOICE_REVERSAL_EXPIRED",
+      "O prazo para estornar o pagamento desta fatura já passou.",
+      HttpStatus.UNPROCESSABLE_ENTITY,
+    );
+  }
+}
+
+export class CreditCardHasOpenInvoiceException extends AppException {
+  constructor() {
+    super(
+      "CREDIT_CARD_HAS_OPEN_INVOICE",
+      "Não é possível excluir um cartão com fatura em aberto.",
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
+export class CreditCardHasFuturePurchaseException extends AppException {
+  constructor() {
+    super(
+      "CREDIT_CARD_HAS_FUTURE_PURCHASE",
+      "Não é possível excluir um cartão com lançamentos futuros.",
+      HttpStatus.CONFLICT,
+    );
+  }
+}
+
 export class InvalidCreditCardPurchaseConfigException extends AppException {
   constructor(message = "Configuração de compra inválida.") {
     super("INVALID_CREDIT_CARD_PURCHASE_CONFIG", message, HttpStatus.UNPROCESSABLE_ENTITY);

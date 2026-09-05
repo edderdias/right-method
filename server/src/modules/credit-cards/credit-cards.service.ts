@@ -9,9 +9,12 @@ import {
 import { PrismaService } from "../../database/prisma.service";
 import {
   CreditCardArchivedException,
+  CreditCardHasFuturePurchaseException,
+  CreditCardHasOpenInvoiceException,
   CreditCardNotFoundException,
   CreditCardReadOnlyException,
 } from "../../common/exceptions/app.exception";
+import { startOfTodaySaoPaulo } from "../../common/utils/date-only";
 import { recalculateCardAvailableLimit } from "./credit-card-limit.util";
 import type { CreateCreditCardDto } from "./dto/create-credit-card.dto";
 import type { UpdateCreditCardDto } from "./dto/update-credit-card.dto";
@@ -87,14 +90,29 @@ export class CreditCardsService {
   }
 
   /** Prefers archiving over deletion whenever the card has history (spec section 40): hard-deletes
-   * only an empty card, otherwise flips it to ARCHIVED so invoices/purchases stay queryable. */
+   * only an empty card, otherwise flips it to ARCHIVED so invoices/purchases stay queryable. Either
+   * way, the card can only be removed once it has no open (unpaid) invoice and no purchase dated in
+   * the future — you can't remove a card that still owes money or has scheduled charges ahead. */
   async archiveOrDelete(userId: string, id: string): Promise<{ archived: boolean }> {
     await this.assertOwnership(userId, id);
 
-    const [invoiceCount, purchaseCount] = await Promise.all([
+    const [openInvoiceCount, futurePurchaseCount, invoiceCount, purchaseCount] = await Promise.all([
+      this.prisma.creditCardInvoice.count({
+        where: { cardId: id, status: { not: CreditCardInvoiceStatus.PAID } },
+      }),
+      this.prisma.creditCardPurchase.count({
+        where: { cardId: id, purchaseDate: { gt: startOfTodaySaoPaulo() } },
+      }),
       this.prisma.creditCardInvoice.count({ where: { cardId: id } }),
       this.prisma.creditCardPurchase.count({ where: { cardId: id } }),
     ]);
+
+    if (openInvoiceCount > 0) {
+      throw new CreditCardHasOpenInvoiceException();
+    }
+    if (futurePurchaseCount > 0) {
+      throw new CreditCardHasFuturePurchaseException();
+    }
 
     if (invoiceCount === 0 && purchaseCount === 0) {
       await this.prisma.creditCard.delete({ where: { id } });

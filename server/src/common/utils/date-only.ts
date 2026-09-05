@@ -22,6 +22,11 @@ export function startOfTodaySaoPaulo(): Date {
   return parseDateOnly(parts);
 }
 
+/** Truncates a date-only value to the 1st of its UTC calendar month. */
+export function startOfMonth(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 1));
+}
+
 export function addDaysToDateOnly(date: Date, days: number): Date {
   const result = new Date(date.getTime());
   result.setUTCDate(result.getUTCDate() + days);

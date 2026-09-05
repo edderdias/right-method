@@ -2,6 +2,8 @@ import { CreditCardInvoiceStatus, Prisma } from "@prisma/client";
 import {
   CreditCardInvoiceAlreadyPaidException,
   CreditCardInvoiceNotFoundException,
+  CreditCardInvoiceNotPaidException,
+  CreditCardInvoiceReversalExpiredException,
 } from "../../common/exceptions/app.exception";
 import { CreditCardInvoicesService } from "./credit-card-invoices.service";
 
@@ -15,6 +17,7 @@ function createPrismaMock() {
     },
     creditCardPurchase: {
       findMany: jest.fn(),
+      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
     },
     account: {
       update: jest.fn(),
@@ -30,10 +33,18 @@ function createPrismaMock() {
     },
     expense: {
       create: jest.fn(),
+      deleteMany: jest.fn(),
     },
   };
   prisma.$transaction = jest.fn(async (callback: (tx: unknown) => unknown) => callback(prisma));
   return prisma;
+}
+
+/** Start (UTC midnight, day 1) of the current calendar month, relative to whenever the suite runs —
+ * keeps "current month forward" list-filter tests correct regardless of the date. */
+function currentMonthStart(): Date {
+  const today = new Date();
+  return new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), 1));
 }
 
 function buildInvoice(overrides: Record<string, unknown> = {}) {
@@ -41,7 +52,7 @@ function buildInvoice(overrides: Record<string, unknown> = {}) {
     id: "inv-1",
     userId: "user-1",
     cardId: "card-1",
-    referenceMonth: new Date("2026-08-01T00:00:00.000Z"),
+    referenceMonth: currentMonthStart(),
     closingDate: new Date("2026-08-10T00:00:00.000Z"),
     dueDate: new Date("2026-08-20T00:00:00.000Z"),
     totalAmount: new Prisma.Decimal(500),
@@ -49,6 +60,9 @@ function buildInvoice(overrides: Record<string, unknown> = {}) {
     status: CreditCardInvoiceStatus.OPEN,
     paidAt: null,
     paidFromAccountId: null,
+    paidExpenseId: null,
+    reversedAt: null,
+    reversalReason: null,
     createdAt: new Date(),
     updatedAt: new Date(),
     ...overrides,
@@ -189,6 +203,114 @@ describe("CreditCardInvoicesService", () => {
       const [result] = await service.list("user-1", "card-1");
 
       expect(result.status).toBe(CreditCardInvoiceStatus.PAID);
+    });
+  });
+
+  describe("list — visible range", () => {
+    it("hides an unpaid invoice from a month before the current one", async () => {
+      const previousMonthStart = new Date(
+        Date.UTC(currentMonthStart().getUTCFullYear(), currentMonthStart().getUTCMonth() - 1, 1),
+      );
+      const old = buildInvoice({ referenceMonth: previousMonthStart });
+      prisma.creditCardInvoice.findMany.mockResolvedValue([old]);
+
+      const result = await service.list("user-1", "card-1");
+
+      expect(result).toHaveLength(0);
+    });
+
+    it("keeps a paid invoice from a past month while its reversal window is still open", async () => {
+      const previousMonthStart = new Date(
+        Date.UTC(currentMonthStart().getUTCFullYear(), currentMonthStart().getUTCMonth() - 1, 1),
+      );
+      const recentlyPaid = buildInvoice({
+        referenceMonth: previousMonthStart,
+        status: CreditCardInvoiceStatus.PAID,
+        closingDate: new Date(), // deadline (closingDate + 1 month) is always ahead of "today"
+      });
+      prisma.creditCardInvoice.findMany.mockResolvedValue([recentlyPaid]);
+
+      const [result] = await service.list("user-1", "card-1");
+
+      expect(result).toBeDefined();
+      expect(result.canReverse).toBe(true);
+    });
+  });
+
+  describe("reversePayment", () => {
+    it("rejects reversing an invoice that hasn't been paid", async () => {
+      prisma.creditCardInvoice.findFirst.mockResolvedValueOnce(buildInvoice());
+
+      await expect(
+        service.reversePayment("user-1", "inv-1", { reason: "Cobrança duplicada" }),
+      ).rejects.toBeInstanceOf(CreditCardInvoiceNotPaidException);
+      expect(prisma.account.update).not.toHaveBeenCalled();
+    });
+
+    it("rejects reversing once the reversal window has closed", async () => {
+      const expired = buildInvoice({
+        status: CreditCardInvoiceStatus.PAID,
+        closingDate: new Date("2020-01-10T00:00:00.000Z"),
+        paidFromAccountId: "acc-1",
+        paidAmount: new Prisma.Decimal(500),
+      });
+      prisma.creditCardInvoice.findFirst.mockResolvedValueOnce(expired);
+
+      await expect(
+        service.reversePayment("user-1", "inv-1", { reason: "Cobrança duplicada" }),
+      ).rejects.toBeInstanceOf(CreditCardInvoiceReversalExpiredException);
+      expect(prisma.account.update).not.toHaveBeenCalled();
+    });
+
+    it("credits the account back, deletes the linked expense, and reopens the invoice", async () => {
+      const paid = buildInvoice({
+        status: CreditCardInvoiceStatus.PAID,
+        closingDate: new Date(),
+        paidAmount: new Prisma.Decimal(500),
+        paidAt: new Date(),
+        paidFromAccountId: "acc-1",
+        paidExpenseId: "exp-1",
+      });
+      prisma.creditCardInvoice.findFirst.mockResolvedValueOnce(paid);
+      prisma.creditCardInvoice.update.mockResolvedValue({
+        ...paid,
+        status: CreditCardInvoiceStatus.OPEN,
+        paidAmount: new Prisma.Decimal(0),
+        paidAt: null,
+        paidFromAccountId: null,
+        paidExpenseId: null,
+        reversedAt: new Date(),
+        reversalReason: "Cobrança duplicada",
+      });
+      prisma.creditCard.findUnique.mockResolvedValue({
+        id: "card-1",
+        source: "MANUAL",
+        creditLimit: new Prisma.Decimal(1000),
+      });
+
+      const result = await service.reversePayment("user-1", "inv-1", {
+        reason: "Cobrança duplicada",
+      });
+
+      expect(prisma.account.update).toHaveBeenCalledWith({
+        where: { id: "acc-1" },
+        data: { balance: { increment: paid.paidAmount } },
+      });
+      expect(prisma.expense.deleteMany).toHaveBeenCalledWith({ where: { id: "exp-1" } });
+      expect(prisma.creditCardInvoice.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: "inv-1" },
+          data: expect.objectContaining({
+            status: CreditCardInvoiceStatus.OPEN,
+            paidAmount: 0,
+            paidAt: null,
+            paidFromAccountId: null,
+            paidExpenseId: null,
+            reversalReason: "Cobrança duplicada",
+          }),
+        }),
+      );
+      expect(result.reversalReason).toBe("Cobrança duplicada");
     });
   });
 });
