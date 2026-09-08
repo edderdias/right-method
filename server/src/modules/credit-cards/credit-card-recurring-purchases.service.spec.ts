@@ -8,7 +8,7 @@ function createPrismaMock() {
       findMany: jest.fn().mockResolvedValue([]),
       create: jest.fn(),
       update: jest.fn(),
-      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     creditCardInvoice: {
       upsert: jest.fn(),

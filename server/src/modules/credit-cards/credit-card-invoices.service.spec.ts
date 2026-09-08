@@ -17,7 +17,7 @@ function createPrismaMock() {
     },
     creditCardPurchase: {
       findMany: jest.fn(),
-      aggregate: jest.fn().mockResolvedValue({ _sum: { amount: null } }),
+      groupBy: jest.fn().mockResolvedValue([]),
     },
     account: {
       update: jest.fn(),
@@ -83,7 +83,7 @@ describe("CreditCardInvoicesService", () => {
   describe("resolveCycle", () => {
     const card = { closingDay: 10, dueDay: 20 };
 
-    it("keeps a purchase on/before the closing day in the current month's cycle", () => {
+    it("keeps a purchase strictly before the closing day in the current month's cycle", () => {
       const cycle = service.resolveCycle(card, new Date("2026-08-09T00:00:00.000Z"));
       expect(cycle.referenceMonth.toISOString().slice(0, 10)).toBe("2026-08-01");
       expect(cycle.closingDate.toISOString().slice(0, 10)).toBe("2026-08-10");
@@ -97,9 +97,10 @@ describe("CreditCardInvoicesService", () => {
       expect(cycle.dueDate.toISOString().slice(0, 10)).toBe("2026-09-20");
     });
 
-    it("treats a purchase exactly on the closing day as still current-cycle", () => {
+    it("rolls a purchase dated exactly on the closing day into next month's cycle", () => {
       const cycle = service.resolveCycle(card, new Date("2026-08-10T00:00:00.000Z"));
-      expect(cycle.referenceMonth.toISOString().slice(0, 10)).toBe("2026-08-01");
+      expect(cycle.referenceMonth.toISOString().slice(0, 10)).toBe("2026-09-01");
+      expect(cycle.closingDate.toISOString().slice(0, 10)).toBe("2026-09-10");
     });
 
     it("rolls the due date to next month when dueDay is on/before closingDay", () => {
@@ -135,7 +136,6 @@ describe("CreditCardInvoicesService", () => {
       prisma.creditCard.findUniqueOrThrow.mockResolvedValue(card);
       prisma.category.findFirst.mockResolvedValue({ id: "cat-card" });
       prisma.expense.create.mockResolvedValue({ id: "exp-1" });
-      prisma.creditCardPurchase.aggregate = jest.fn().mockResolvedValue({ _sum: { amount: null } });
 
       const result = await service.pay("user-1", "inv-1", { accountId: "acc-1" });
 

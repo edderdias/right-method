@@ -23,7 +23,9 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { MoneyInput } from "@/components/ui/money-input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -47,6 +49,7 @@ import type { CreditCardPurchase } from "@/types/credit-card";
 
 const purchaseFormSchema = z
   .object({
+    type: z.enum(["PURCHASE", "CREDIT"]),
     description: z.string().min(2, "Informe uma descrição.").max(160),
     amount: z
       .number({ invalid_type_error: "Informe um valor." })
@@ -68,6 +71,10 @@ const purchaseFormSchema = z
     message: "Uma compra não pode ser parcelada e recorrente ao mesmo tempo.",
     path: ["isRecurring"],
   })
+  .refine((values) => !(values.type === "CREDIT" && values.isRecurring), {
+    message: "Um crédito não pode ser recorrente.",
+    path: ["isRecurring"],
+  })
   .refine(
     (values) =>
       !values.isRecurring ||
@@ -84,6 +91,7 @@ type PurchaseFormValues = z.infer<typeof purchaseFormSchema>;
 function toFormDefaults(purchase: CreditCardPurchase | null): PurchaseFormValues {
   if (!purchase) {
     return {
+      type: "PURCHASE",
       description: "",
       amount: undefined as unknown as number,
       purchaseDate: new Date(),
@@ -97,6 +105,7 @@ function toFormDefaults(purchase: CreditCardPurchase | null): PurchaseFormValues
     };
   }
   return {
+    type: purchase.type,
     description: purchase.description,
     amount: purchase.amount,
     purchaseDate: parseISODateToLocalDate(purchase.purchaseDate),
@@ -148,7 +157,8 @@ export function PurchaseFormDialog({
   const familyAccess = useFamilyAccess();
   const isEditing = Boolean(purchase);
   const isReadOnly = purchase?.source === "OPEN_FINANCE";
-  const canToggleRecurrence = !isReadOnly && !purchase?.installmentGroupId;
+  const canToggleRecurrence =
+    !isReadOnly && !purchase?.installmentGroupId && purchase?.type !== "CREDIT";
   const submitting = createPurchase.isPending || updatePurchase.isPending;
   const [isNewCategoryOpen, setIsNewCategoryOpen] = useState(false);
 
@@ -170,6 +180,8 @@ export function PurchaseFormDialog({
     resolver: zodResolver(purchaseFormSchema),
     defaultValues: toFormDefaults(purchase),
   });
+  const type = form.watch("type");
+  const isCredit = type === "CREDIT";
   const isInstallment = form.watch("isInstallment");
   const isRecurring = form.watch("isRecurring");
   const amount = form.watch("amount");
@@ -228,6 +240,7 @@ export function PurchaseFormDialog({
           description: values.description,
           amount: values.amount,
           purchaseDate: toISODateString(values.purchaseDate),
+          type: values.type,
           ...(values.categoryId ? { categoryId: values.categoryId } : {}),
           ...(trimmedResponsible ? { responsibleName: trimmedResponsible } : {}),
           ...notes,
@@ -253,18 +266,64 @@ export function PurchaseFormDialog({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Editar compra" : "Nova compra"}</DialogTitle>
+            <DialogTitle>
+              {isEditing
+                ? purchase?.type === "CREDIT"
+                  ? "Editar crédito"
+                  : "Editar compra"
+                : isCredit
+                  ? "Novo crédito"
+                  : "Nova compra"}
+            </DialogTitle>
             <DialogDescription>
               {isReadOnly
                 ? "Compra importada via Open Finance — apenas categoria e observação podem ser alteradas."
                 : isEditing
                   ? "Atualize os dados da compra."
-                  : "Lance uma compra à vista, parcelada ou recorrente neste cartão."}
+                  : isCredit
+                    ? "Lance um crédito (estorno de compra) neste cartão — o valor é abatido do total da fatura, à vista ou parcelado."
+                    : "Lance uma compra à vista, parcelada ou recorrente neste cartão."}
             </DialogDescription>
           </DialogHeader>
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
+              {!isEditing && (
+                <FormField
+                  control={form.control}
+                  name="type"
+                  render={({ field }) => (
+                    <FormItem className="space-y-2">
+                      <FormLabel>Tipo de lançamento</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          value={field.value}
+                          onValueChange={(value) => {
+                            field.onChange(value);
+                            if (value === "CREDIT") form.setValue("isRecurring", false);
+                          }}
+                          className="grid grid-cols-2 gap-2"
+                        >
+                          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-input p-3 text-sm">
+                            <RadioGroupItem value="PURCHASE" id="type-purchase" />
+                            <Label htmlFor="type-purchase" className="cursor-pointer font-normal">
+                              Compra
+                            </Label>
+                          </label>
+                          <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-input p-3 text-sm">
+                            <RadioGroupItem value="CREDIT" id="type-credit" />
+                            <Label htmlFor="type-credit" className="cursor-pointer font-normal">
+                              Crédito (estorno)
+                            </Label>
+                          </label>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
               <FormField
                 control={form.control}
                 name="description"
@@ -273,7 +332,7 @@ export function PurchaseFormDialog({
                     <FormLabel>Descrição</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="Supermercado, Netflix..."
+                        placeholder={isCredit ? "Estorno - Blusa devolvida..." : "Supermercado, Netflix..."}
                         disabled={isReadOnly}
                         {...field}
                       />
@@ -289,7 +348,15 @@ export function PurchaseFormDialog({
                   name="amount"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>{isInstallment ? "Valor total da compra" : "Valor"}</FormLabel>
+                      <FormLabel>
+                        {isCredit
+                          ? isInstallment
+                            ? "Valor total do crédito"
+                            : "Valor do crédito"
+                          : isInstallment
+                            ? "Valor total da compra"
+                            : "Valor"}
+                      </FormLabel>
                       <FormControl>
                         <MoneyInput
                           value={field.value}
@@ -389,7 +456,9 @@ export function PurchaseFormDialog({
                     name="isInstallment"
                     render={({ field }) => (
                       <FormItem className="flex flex-row items-center justify-between rounded-lg border border-input p-3">
-                        <FormLabel className="cursor-pointer">Compra parcelada</FormLabel>
+                        <FormLabel className="cursor-pointer">
+                          {isCredit ? "Parcelar o crédito" : "Compra parcelada"}
+                        </FormLabel>
                         <FormControl>
                           <Switch
                             checked={field.value}
@@ -432,34 +501,36 @@ export function PurchaseFormDialog({
                     />
                   )}
 
-                  <FormField
-                    control={form.control}
-                    name="isRecurring"
-                    render={({ field }) => (
-                      <FormItem className="flex flex-row items-center justify-between rounded-lg border border-input p-3">
-                        <div className="space-y-0.5">
-                          <FormLabel className="cursor-pointer">Compra recorrente</FormLabel>
-                          <p className="text-sm text-muted-foreground">
-                            Lançada automaticamente todo mês até você informar o fim.
-                          </p>
-                        </div>
-                        <FormControl>
-                          <Switch
-                            checked={field.value}
-                            onCheckedChange={(checked) => {
-                              field.onChange(checked);
-                              if (checked) {
-                                form.setValue("isInstallment", false);
-                                form.setValue("totalInstallments", undefined);
-                              }
-                            }}
-                          />
-                        </FormControl>
-                      </FormItem>
-                    )}
-                  />
+                  {!isCredit && (
+                    <FormField
+                      control={form.control}
+                      name="isRecurring"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border border-input p-3">
+                          <div className="space-y-0.5">
+                            <FormLabel className="cursor-pointer">Compra recorrente</FormLabel>
+                            <p className="text-sm text-muted-foreground">
+                              Lançada automaticamente todo mês até você informar o fim.
+                            </p>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={(checked) => {
+                                field.onChange(checked);
+                                if (checked) {
+                                  form.setValue("isInstallment", false);
+                                  form.setValue("totalInstallments", undefined);
+                                }
+                              }}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
-                  {isRecurring && (
+                  {!isCredit && isRecurring && (
                     <FormField
                       control={form.control}
                       name="recurrenceEndDate"
@@ -556,6 +627,8 @@ export function PurchaseFormDialog({
                       <Loader2 className="size-4 animate-spin" aria-hidden="true" />
                       Salvando...
                     </>
+                  ) : isCredit ? (
+                    "Salvar crédito"
                   ) : (
                     "Salvar compra"
                   )}

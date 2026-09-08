@@ -4,12 +4,16 @@ import { CreditCard, Plus, Trash2, Wifi } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArchiveCreditCardDialog } from "@/components/cartoes/archive-credit-card-dialog";
 import { NewCreditCardDialog } from "@/components/cartoes/new-credit-card-dialog";
-import { useCreditCards, useCreditCardsSummary } from "@/hooks/use-credit-cards";
+import {
+  useAllCardsResponsiblesSummary,
+  useCreditCards,
+  useCreditCardsSummary,
+} from "@/hooks/use-credit-cards";
 import { requireAuth } from "@/lib/auth";
 import { formatBRL } from "@/lib/finance-format";
 import { MaskableAmount } from "@/components/ui/maskable-amount";
@@ -145,6 +149,7 @@ function CreditCardTile({ card, onArchive }: { card: CreditCardModel; onArchive:
 function CartoesPage() {
   const cardsQuery = useCreditCards();
   const summaryQuery = useCreditCardsSummary();
+  const responsiblesQuery = useAllCardsResponsiblesSummary();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [archiving, setArchiving] = useState<CreditCardModel | null>(null);
 
@@ -154,6 +159,9 @@ function CartoesPage() {
     summary && summary.totalLimit > 0
       ? Math.round((summary.totalUsed / summary.totalLimit) * 100)
       : 0;
+
+  const responsibles = responsiblesQuery.data ?? [];
+  const responsiblesTotal = responsibles.reduce((sum, row) => sum + row.total, 0);
 
   return (
     <AppShell>
@@ -203,13 +211,19 @@ function CartoesPage() {
         </Card>
         <Card className="rounded-3xl border-border/70 shadow-soft">
           <CardContent className="p-5">
-            <p className="text-sm text-muted-foreground">Faturas em aberto</p>
+            <p className="text-sm text-muted-foreground">Fatura do mês</p>
             {summaryQuery.isLoading ? (
               <Skeleton className="mt-2 h-8 w-32" />
             ) : (
-              <p className="mt-1 text-2xl font-semibold tracking-tight">
-                <MaskableAmount value={formatBRL(summary?.openInvoicesTotal ?? 0)} />
-              </p>
+              <>
+                <p className="mt-1 text-2xl font-semibold tracking-tight">
+                  <MaskableAmount value={formatBRL(summary?.currentMonthInvoicesTotal ?? 0)} />
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Total em aberto (todas as faturas):{" "}
+                  <MaskableAmount value={formatBRL(summary?.openInvoicesTotal ?? 0)} />
+                </p>
+              </>
             )}
           </CardContent>
         </Card>
@@ -247,6 +261,52 @@ function CartoesPage() {
           </div>
         )}
       </section>
+
+      {cards.length > 0 && (
+        <Card className="rounded-3xl border-border/70 shadow-soft">
+          <CardHeader>
+            <CardTitle className="text-base font-semibold">Gastos por responsável</CardTitle>
+            <p className="text-xs text-muted-foreground">Somando todos os cartões ativos</p>
+          </CardHeader>
+          <CardContent>
+            {responsiblesQuery.isLoading ? (
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <Skeleton key={index} className="h-10 w-full rounded-xl" />
+                ))}
+              </div>
+            ) : responsibles.length === 0 ? (
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                Nenhuma compra registrada ainda.
+              </p>
+            ) : (
+              <ul className="divide-y divide-border/60">
+                {responsibles.map((row) => {
+                  const label = row.responsibleName ?? "Sem responsável";
+                  const pct =
+                    responsiblesTotal > 0 ? Math.round((row.total / responsiblesTotal) * 100) : 0;
+                  return (
+                    <li
+                      key={label}
+                      className="flex items-center justify-between gap-3 py-2.5 text-sm"
+                    >
+                      <span className="flex min-w-0 flex-col">
+                        <span className="truncate font-medium">{label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {row.count} {row.count === 1 ? "compra" : "compras"} · {pct}%
+                        </span>
+                      </span>
+                      <span className="whitespace-nowrap font-semibold">
+                        <MaskableAmount value={formatBRL(row.total)} />
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <NewCreditCardDialog open={dialogOpen} onOpenChange={setDialogOpen} />
       <ArchiveCreditCardDialog

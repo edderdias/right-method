@@ -1,5 +1,6 @@
 import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import type {
+  CardCurrentInvoice,
   CreateCreditCardInput,
   CreditCard,
   CreditCardInvoice,
@@ -31,6 +32,20 @@ export async function listCreditCards(): Promise<CreditCard[]> {
 
 export async function getCreditCardsSummary(): Promise<CreditCardSummary> {
   const { data } = await apiGet<ApiEnvelope<CreditCardSummary>>("/credit-cards/summary");
+  return data;
+}
+
+export async function getAllCardsResponsiblesSummary(): Promise<ResponsibleSummary[]> {
+  const { data } = await apiGet<ApiEnvelope<ResponsibleSummary[]>>(
+    "/credit-cards/responsibles-summary",
+  );
+  return data;
+}
+
+export async function getCardsCurrentInvoices(): Promise<CardCurrentInvoice[]> {
+  const { data } = await apiGet<ApiEnvelope<CardCurrentInvoice[]>>(
+    "/credit-cards/current-invoices",
+  );
   return data;
 }
 

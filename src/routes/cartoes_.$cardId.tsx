@@ -516,7 +516,7 @@ function CartaoDetailPage() {
               className="rounded-xl bg-gradient-brand font-semibold"
             >
               <Plus className="size-4" aria-hidden="true" />
-              Nova compra
+              Novo lançamento
             </Button>
           </div>
 
@@ -625,7 +625,14 @@ function CartaoDetailPage() {
                     </TableCell>
                     <TableCell>
                       <div className="min-w-0">
-                        <p className="truncate">{purchase.description}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate">{purchase.description}</p>
+                          {purchase.type === "CREDIT" && (
+                            <span className="shrink-0 rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-medium text-primary">
+                              Crédito
+                            </span>
+                          )}
+                        </div>
                         {purchase.source === "OPEN_FINANCE" && (
                           <p className="text-xs text-muted-foreground">Open Finance</p>
                         )}
@@ -642,8 +649,14 @@ function CartaoDetailPage() {
                         ? `${purchase.installmentNumber}/${purchase.installmentTotal}`
                         : "1x"}
                     </TableCell>
-                    <TableCell className="text-right font-semibold whitespace-nowrap">
-                      -{formatBRL(purchase.amount)}
+                    <TableCell
+                      className={cn(
+                        "text-right font-semibold whitespace-nowrap",
+                        purchase.type === "CREDIT" && "text-primary",
+                      )}
+                    >
+                      {purchase.type === "CREDIT" ? "+" : "-"}
+                      {formatBRL(purchase.amount)}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">

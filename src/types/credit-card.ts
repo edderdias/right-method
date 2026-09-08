@@ -5,6 +5,7 @@ export type CreditCardSource = "MANUAL" | "OPEN_FINANCE";
 export type CreditCardStatus = "ACTIVE" | "ARCHIVED";
 export type CreditCardInvoiceStatus = "OPEN" | "CLOSED" | "DUE" | "PAID" | "OVERDUE";
 export type CardPurchaseSource = "MANUAL" | "OPEN_FINANCE";
+export type CardPurchaseType = "PURCHASE" | "CREDIT";
 
 export interface CreditCard {
   id: string;
@@ -31,6 +32,12 @@ export interface CreditCardSummary {
   totalAvailable: number;
   totalUsed: number;
   openInvoicesTotal: number;
+  currentMonthInvoicesTotal: number;
+}
+
+export interface CardCurrentInvoice {
+  cardId: string;
+  currentInvoiceTotal: number;
 }
 
 export interface CreditCardPurchase {
@@ -46,6 +53,7 @@ export interface CreditCardPurchase {
   category: Category | null;
   responsibleName: string | null;
   source: CardPurchaseSource;
+  type: CardPurchaseType;
   installmentGroupId: string | null;
   installmentNumber: number | null;
   installmentTotal: number | null;
@@ -127,6 +135,7 @@ export interface CreatePurchaseInput {
   purchaseDate: string;
   categoryId?: string;
   responsibleName?: string;
+  type?: CardPurchaseType;
   totalInstallments?: number;
   isRecurring?: boolean;
   recurrenceEndDate?: string;

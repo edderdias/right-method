@@ -49,9 +49,10 @@ export class CreditCardInvoicesService {
   ) {}
 
   /** Given the card's closing/due day, decides which monthly invoice cycle a purchase date falls
-   * into: on/before the closing day it's the current cycle, after it rolls to next month's
-   * invoice (spec section 29). Falls back to sane defaults for Open Finance cards whose provider
-   * hasn't reported a cycle yet. */
+   * into: strictly before the closing day it's the current cycle; on or after the closing day it
+   * rolls to next month's invoice (spec section 29) — e.g. closing day 4 sends a purchase dated the
+   * 4th to next month's invoice, not the current one. Falls back to sane defaults for Open Finance
+   * cards whose provider hasn't reported a cycle yet. */
   resolveCycle(
     card: { closingDay: number | null; dueDay: number | null },
     purchaseDate: Date,
@@ -63,7 +64,7 @@ export class CreditCardInvoicesService {
     let cycleMonth = new Date(
       Date.UTC(purchaseDate.getUTCFullYear(), purchaseDate.getUTCMonth(), 1),
     );
-    if (day > closingDay) {
+    if (day >= closingDay) {
       cycleMonth = addMonthsToDateOnly(cycleMonth, 1);
     }
 

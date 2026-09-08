@@ -1,8 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import { CardPurchaseType } from "@prisma/client";
 import { Type } from "class-transformer";
 import {
   IsBoolean,
   IsDateString,
+  IsEnum,
   IsInt,
   IsNumber,
   IsOptional,
@@ -31,6 +33,16 @@ export class CreateCreditCardPurchaseDto {
   @ApiProperty({ example: "2026-08-10" })
   @IsDateString()
   purchaseDate!: string;
+
+  @ApiPropertyOptional({
+    enum: CardPurchaseType,
+    default: CardPurchaseType.PURCHASE,
+    description:
+      "PURCHASE (padrão) para uma compra, ou CREDIT para um crédito/estorno que abate o valor total da fatura.",
+  })
+  @IsOptional()
+  @IsEnum(CardPurchaseType)
+  type?: CardPurchaseType;
 
   @ApiPropertyOptional({ format: "uuid" })
   @IsOptional()

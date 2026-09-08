@@ -40,7 +40,11 @@ import {
   useUpcomingBills,
 } from "@/hooks/use-revenues";
 import { useExpensesByCategory, useExpensesEvolution } from "@/hooks/use-expenses";
-import { useCreditCardsSummary } from "@/hooks/use-credit-cards";
+import {
+  useCardsCurrentInvoices,
+  useCreditCards,
+  useCreditCardsSummary,
+} from "@/hooks/use-credit-cards";
 import { useFinancialGoals, useFinancialGoalsSummary } from "@/hooks/use-financial-goals";
 import { useInvestmentsSummary } from "@/hooks/use-investments";
 import { useCurrentUser } from "@/hooks/use-user-settings";
@@ -92,8 +96,12 @@ function DashboardPage() {
   const revenuesEvolutionQuery = useRevenuesEvolution(6);
   const expensesEvolutionQuery = useExpensesEvolution(6);
   const expensesByCategoryQuery = useExpensesByCategory({});
+  const creditCardsQuery = useCreditCards();
   const creditCardsSummaryQuery = useCreditCardsSummary();
+  const cardsCurrentInvoicesQuery = useCardsCurrentInvoices();
   const creditCardsSummary = creditCardsSummaryQuery.data;
+  const creditCards = creditCardsQuery.data ?? [];
+  const cardsCurrentInvoices = cardsCurrentInvoicesQuery.data ?? [];
   const creditCardsUsedPct =
     creditCardsSummary && creditCardsSummary.totalLimit > 0
       ? Math.round((creditCardsSummary.totalUsed / creditCardsSummary.totalLimit) * 100)
@@ -174,8 +182,8 @@ function DashboardPage() {
             )
           }
           hint={
-            creditCardsSummary && creditCardsSummary.openInvoicesTotal > 0
-              ? `+ ${brl(creditCardsSummary.openInvoicesTotal)} em faturas de cartão a pagar`
+            creditCardsSummary && creditCardsSummary.currentMonthInvoicesTotal > 0
+              ? `+ ${brl(creditCardsSummary.currentMonthInvoicesTotal)} em faturas de cartão a pagar`
               : undefined
           }
           icon={ArrowDownRight}
@@ -483,7 +491,9 @@ function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent className="space-y-4">
-            {creditCardsSummaryQuery.isLoading ? (
+            {creditCardsSummaryQuery.isLoading ||
+            creditCardsQuery.isLoading ||
+            cardsCurrentInvoicesQuery.isLoading ? (
               <Skeleton className="h-40 w-full rounded-2xl" />
             ) : !creditCardsSummary || creditCardsSummary.cardCount === 0 ? (
               <div className="flex flex-col items-center gap-2 py-6 text-center">
@@ -502,8 +512,29 @@ function DashboardPage() {
                     <CreditCard className="size-6" aria-hidden="true" />
                     <span className="text-xs uppercase tracking-widest opacity-80">Crédito</span>
                   </div>
-                  <p className="mt-8 text-sm opacity-80">Faturas em aberto</p>
-                  <p className="text-2xl font-semibold">
+                  <p className="mt-8 text-sm opacity-80">Fatura do mês por cartão</p>
+                  <div className="mt-2 space-y-1.5">
+                    {creditCards.map((card) => {
+                      const invoiceTotal =
+                        cardsCurrentInvoices.find((invoice) => invoice.cardId === card.id)
+                          ?.currentInvoiceTotal ?? 0;
+                      return (
+                        <div
+                          key={card.id}
+                          className="flex items-center justify-between gap-2 text-sm"
+                        >
+                          <span className="truncate opacity-90">
+                            {card.institutionName ?? card.name}
+                          </span>
+                          <span className="shrink-0 font-semibold">
+                            <MaskableAmount value={brl(invoiceTotal)} />
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <p className="mt-3 text-xs opacity-70">
+                    Total em aberto (todas as faturas):{" "}
                     <MaskableAmount value={brl(creditCardsSummary.openInvoicesTotal)} />
                   </p>
                 </div>
