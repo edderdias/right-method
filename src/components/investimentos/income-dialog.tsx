@@ -148,7 +148,7 @@ export function IncomeDialog({ investment, open, onOpenChange }: IncomeDialogPro
                   <FormItem>
                     <FormLabel>Data do pagamento</FormLabel>
                     <FormControl>
-                      <DatePicker value={field.value} onChange={field.onChange} />
+                      <DatePicker value={field.value} onChange={field.onChange} required />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

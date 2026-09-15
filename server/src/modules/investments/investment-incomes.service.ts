@@ -15,22 +15,38 @@ export class InvestmentIncomesService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  /** Pure record-keeping — rendimentos are cash received and never touch quantity/investedAmount,
-   * which are reserved for capital movements (see InvestmentTransactionsService). */
+  /** Rendimentos are cash received and never touch quantity/investedAmount, which are reserved
+   * for capital movements (see InvestmentTransactionsService) — but they do grow currentValue
+   * (and therefore rentabilidade), same as accrued interest would, unless the position already
+   * has a live market mark (currentPrice), in which case a price update governs currentValue
+   * instead. */
   async create(
     userId: string,
     investment: Investment,
     dto: CreateInvestmentIncomeDto,
   ): Promise<PublicInvestmentIncome> {
-    const income = await this.prisma.investmentIncome.create({
-      data: {
-        userId,
-        investmentId: investment.id,
-        type: dto.type,
-        amount: dto.amount,
-        paymentDate: parseDateOnly(dto.paymentDate),
-        notes: dto.notes,
-      },
+    const hasLiveMark = investment.currentPrice !== null;
+
+    const income = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.investmentIncome.create({
+        data: {
+          userId,
+          investmentId: investment.id,
+          type: dto.type,
+          amount: dto.amount,
+          paymentDate: parseDateOnly(dto.paymentDate),
+          notes: dto.notes,
+        },
+      });
+
+      if (!hasLiveMark) {
+        await tx.investment.update({
+          where: { id: investment.id },
+          data: { currentValue: { increment: dto.amount } },
+        });
+      }
+
+      return created;
     });
 
     await this.notifications.create({
@@ -54,8 +70,25 @@ export class InvestmentIncomesService {
   }
 
   async remove(userId: string, id: string): Promise<void> {
-    await this.assertOwnership(userId, id);
-    await this.prisma.investmentIncome.delete({ where: { id } });
+    const income = await this.assertOwnership(userId, id);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.investmentIncome.delete({ where: { id } });
+
+      const investment = await tx.investment.findUniqueOrThrow({
+        where: { id: income.investmentId },
+      });
+      if (investment.currentPrice === null) {
+        const newCurrentValue = Math.max(
+          0,
+          Number(investment.currentValue) - Number(income.amount),
+        );
+        await tx.investment.update({
+          where: { id: investment.id },
+          data: { currentValue: newCurrentValue },
+        });
+      }
+    });
   }
 
   async assertOwnership(userId: string, id: string): Promise<InvestmentIncome> {

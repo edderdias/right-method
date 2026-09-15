@@ -25,6 +25,7 @@ import {
   Repeat,
   RotateCcw,
   Trash2,
+  Wallet,
 } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
@@ -498,6 +499,10 @@ function ReceitasPage() {
                       <p className="truncate text-sm font-medium">{revenue.description}</p>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                         {revenue.category.name} · {formatShortDate(revenue.dueDate)}
+                        <span className="inline-flex items-center gap-1">
+                          <Wallet className="size-3" aria-hidden="true" />
+                          {revenue.account.name}
+                        </span>
                         {revenue.isRecurring && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-info/12 px-2 py-0.5 text-info">
                             <Repeat className="size-3" aria-hidden="true" /> recorrente

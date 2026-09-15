@@ -35,8 +35,9 @@ import { PluggyConnectButton } from "@/components/contas/pluggy-connect-button";
 import { TransferDialog } from "@/components/contas/transfer-dialog";
 import { useConnectedAccounts, useConnections, useSyncAccount } from "@/hooks/use-open-finance";
 import {
-  useAccountTransfers,
   useAccounts,
+  useAccountsSummary,
+  useAccountTransfers,
   useDeleteAccountTransfer,
 } from "@/hooks/use-revenues";
 import { requireAuth } from "@/lib/auth";
@@ -105,6 +106,7 @@ function StatusPill({ status }: { status: ConnectionStatus }) {
 
 function ManualAccountsTab() {
   const accountsQuery = useAccounts();
+  const accountsSummaryQuery = useAccountsSummary({});
   const transfersQuery = useAccountTransfers();
   const deleteTransfer = useDeleteAccountTransfer();
 
@@ -116,6 +118,10 @@ function ManualAccountsTab() {
   const accounts = accountsQuery.data ?? [];
   const transfers = transfersQuery.data ?? [];
   const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0);
+  const accountsSummary = accountsSummaryQuery.data;
+  const summaryByAccountId = new Map(
+    (accountsSummary?.accounts ?? []).map((item) => [item.id, item]),
+  );
 
   function openCreate() {
     setEditingAccount(null);
@@ -159,6 +165,16 @@ function ManualAccountsTab() {
             <p className="mt-1 text-2xl font-semibold tracking-tight">
               <MaskableAmount value={formatBRL(totalBalance)} />
             </p>
+          )}
+          {accountsSummary && (
+            <div className="mt-3 flex items-center gap-3 text-xs">
+              <span className="text-primary">
+                +{formatBRL(accountsSummary.totals.received)} recebido no mês
+              </span>
+              <span className="text-warning">
+                −{formatBRL(accountsSummary.totals.spent)} gasto no mês
+              </span>
+            </div>
           )}
         </CardContent>
       </Card>
@@ -227,6 +243,16 @@ function ManualAccountsTab() {
                       <MaskableAmount value={formatBRL(account.balance)} />
                     </p>
                   </div>
+                  {summaryByAccountId.has(account.id) && (
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-primary">
+                        +{formatBRL(summaryByAccountId.get(account.id)!.received)} recebido
+                      </span>
+                      <span className="text-warning">
+                        −{formatBRL(summaryByAccountId.get(account.id)!.spent)} gasto
+                      </span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}

@@ -14,6 +14,10 @@ export interface DatePickerProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  /** When true, re-clicking the already-selected day keeps it selected instead of clearing it —
+   * react-day-picker's single mode toggles a re-clicked day off by default, which silently empties
+   * required date fields whose default value is today (e.g. clicking "today" to confirm it). */
+  required?: boolean;
 }
 
 function DatePicker({
@@ -22,6 +26,7 @@ function DatePicker({
   placeholder = "Selecione uma data",
   disabled,
   className,
+  required,
 }: DatePickerProps) {
   const [open, setOpen] = React.useState(false);
 
@@ -47,6 +52,10 @@ function DatePicker({
           mode="single"
           selected={value}
           onSelect={(date) => {
+            if (date === undefined && required) {
+              setOpen(false);
+              return;
+            }
             onChange(date);
             setOpen(false);
           }}
