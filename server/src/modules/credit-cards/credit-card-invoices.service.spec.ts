@@ -112,6 +112,24 @@ describe("CreditCardInvoicesService", () => {
       expect(cycle.dueDate.toISOString().slice(0, 10)).toBe("2026-09-05");
     });
 
+    it("keeps a purchase dated exactly on the closing day in the current cycle when closingDay is after dueDay", () => {
+      const cycle = service.resolveCycle(
+        { closingDay: 28, dueDay: 12 },
+        new Date("2026-09-28T00:00:00.000Z"),
+      );
+      expect(cycle.closingDate.toISOString().slice(0, 10)).toBe("2026-09-28");
+      expect(cycle.dueDate.toISOString().slice(0, 10)).toBe("2026-10-12");
+    });
+
+    it("rolls a purchase dated the day after closing into next month's cycle when closingDay is after dueDay", () => {
+      const cycle = service.resolveCycle(
+        { closingDay: 28, dueDay: 12 },
+        new Date("2026-09-29T00:00:00.000Z"),
+      );
+      expect(cycle.closingDate.toISOString().slice(0, 10)).toBe("2026-10-28");
+      expect(cycle.dueDate.toISOString().slice(0, 10)).toBe("2026-11-12");
+    });
+
     it("falls back to sane defaults when the card has no closing/due day configured yet", () => {
       const cycle = service.resolveCycle(
         { closingDay: null, dueDay: null },

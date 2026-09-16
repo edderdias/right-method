@@ -49,10 +49,15 @@ export class CreditCardInvoicesService {
   ) {}
 
   /** Given the card's closing/due day, decides which monthly invoice cycle a purchase date falls
-   * into: strictly before the closing day it's the current cycle; on or after the closing day it
-   * rolls to next month's invoice (spec section 29) — e.g. closing day 4 sends a purchase dated the
-   * 4th to next month's invoice, not the current one. Falls back to sane defaults for Open Finance
-   * cards whose provider hasn't reported a cycle yet. */
+   * into. When the due day is in the same month as the closing day (closingDay < dueDay, e.g.
+   * closes the 4th and is due the 10th), a purchase strictly before the closing day is the current
+   * cycle and one on/after the closing day rolls to next month's invoice (spec section 29) — e.g.
+   * closing day 4 sends a purchase dated the 4th to next month's invoice, not the current one. When
+   * the due day rolls into the following month instead (closingDay > dueDay, e.g. closes the 28th
+   * and is due the 12th), the closing day itself is still the last day of the current cycle — only
+   * a purchase strictly after it rolls forward, e.g. a purchase on the 28th still closes on the
+   * 28th, and only one dated the 29th rolls into the invoice that closes next month. Falls back to
+   * sane defaults for Open Finance cards whose provider hasn't reported a cycle yet. */
   resolveCycle(
     card: { closingDay: number | null; dueDay: number | null },
     purchaseDate: Date,
@@ -60,11 +65,12 @@ export class CreditCardInvoicesService {
     const closingDay = card.closingDay ?? DEFAULT_CLOSING_DAY;
     const dueDay = card.dueDay ?? DEFAULT_DUE_DAY;
     const day = purchaseDate.getUTCDate();
+    const rollsToNextCycle = closingDay > dueDay ? day > closingDay : day >= closingDay;
 
     let cycleMonth = new Date(
       Date.UTC(purchaseDate.getUTCFullYear(), purchaseDate.getUTCMonth(), 1),
     );
-    if (day >= closingDay) {
+    if (rollsToNextCycle) {
       cycleMonth = addMonthsToDateOnly(cycleMonth, 1);
     }
 
