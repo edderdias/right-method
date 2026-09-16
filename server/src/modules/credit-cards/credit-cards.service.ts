@@ -14,7 +14,7 @@ import {
   CreditCardNotFoundException,
   CreditCardReadOnlyException,
 } from "../../common/exceptions/app.exception";
-import { startOfTodaySaoPaulo } from "../../common/utils/date-only";
+import { startOfMonth, startOfTodaySaoPaulo } from "../../common/utils/date-only";
 import { recalculateCardAvailableLimit } from "./credit-card-limit.util";
 import type { CreateCreditCardDto } from "./dto/create-credit-card.dto";
 import type { UpdateCreditCardDto } from "./dto/update-credit-card.dto";
@@ -30,6 +30,12 @@ export interface CreditCardSummary {
   totalAvailable: number;
   totalUsed: number;
   openInvoicesTotal: number;
+  currentMonthInvoicesTotal: number;
+}
+
+export interface CardCurrentInvoice {
+  cardId: string;
+  currentInvoiceTotal: number;
 }
 
 @Injectable()
@@ -147,13 +153,46 @@ export class CreditCardsService {
       _sum: { totalAmount: true },
     });
 
+    // Scoped to the current cycle's invoice (referenceMonth is always the 1st of its month) so the
+    // dashboard's "despesas do mês" hint reflects this month's bill specifically, not every open
+    // invoice ever. Deliberately NOT filtered by status — this is "what is this month's invoice",
+    // regardless of whether it's already been paid, unlike `openInvoicesTotal` below which is
+    // "how much is still owed overall".
+    const currentMonthInvoicesAgg = await this.prisma.creditCardInvoice.aggregate({
+      where: {
+        userId,
+        referenceMonth: startOfMonth(startOfTodaySaoPaulo()),
+        card: { status: CreditCardStatus.ACTIVE },
+      },
+      _sum: { totalAmount: true },
+    });
+
     return {
       cardCount: cards.length,
       totalLimit,
       totalAvailable,
       totalUsed: totalLimit - totalAvailable,
       openInvoicesTotal: Number(openInvoicesAgg._sum.totalAmount ?? 0),
+      currentMonthInvoicesTotal: Number(currentMonthInvoicesAgg._sum.totalAmount ?? 0),
     };
+  }
+
+  /** Each active card's own current-cycle invoice total (regardless of paid status) — feeds the
+   * per-card breakdown on the main dashboard's "Cartões" widget. A card with no invoice yet this
+   * cycle (no purchases landed in it) simply has no entry in the result. */
+  async getCardsCurrentInvoices(userId: string): Promise<CardCurrentInvoice[]> {
+    const invoices = await this.prisma.creditCardInvoice.findMany({
+      where: {
+        userId,
+        referenceMonth: startOfMonth(startOfTodaySaoPaulo()),
+        card: { status: CreditCardStatus.ACTIVE },
+      },
+      select: { cardId: true, totalAmount: true },
+    });
+    return invoices.map((invoice) => ({
+      cardId: invoice.cardId,
+      currentInvoiceTotal: Number(invoice.totalAmount),
+    }));
   }
 
   async assertOwnership(userId: string, id: string): Promise<CreditCard> {

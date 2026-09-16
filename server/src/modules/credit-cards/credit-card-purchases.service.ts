@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { Injectable } from "@nestjs/common";
-import { CardPurchaseSource, CategoryType, Prisma } from "@prisma/client";
+import { CardPurchaseSource, CardPurchaseType, CategoryType, CreditCardStatus, Prisma } from "@prisma/client";
 import { PrismaService } from "../../database/prisma.service";
 import { CategoriesService } from "../categories/categories.service";
 import {
@@ -74,6 +74,7 @@ export class CreditCardPurchasesService {
       );
     }
 
+    const type = dto.type ?? CardPurchaseType.PURCHASE;
     const totalInstallments = dto.totalInstallments ?? 1;
     const isRecurring = dto.isRecurring ?? false;
     if (isRecurring && totalInstallments > 1) {
@@ -81,8 +82,11 @@ export class CreditCardPurchasesService {
         "Uma compra não pode ser recorrente e parcelada ao mesmo tempo.",
       );
     }
+    if (type === CardPurchaseType.CREDIT && isRecurring) {
+      throw new InvalidCreditCardPurchaseConfigException("Um crédito não pode ser recorrente.");
+    }
     if (totalInstallments > 1) {
-      return this.createInstallments(userId, card, dto, totalInstallments);
+      return this.createInstallments(userId, card, dto, totalInstallments, type);
     }
 
     const purchaseDate = parseDateOnly(dto.purchaseDate);
@@ -113,6 +117,7 @@ export class CreditCardPurchasesService {
           responsibleName: normalizeResponsibleName(dto.responsibleName),
           notes: dto.notes,
           source: CardPurchaseSource.MANUAL,
+          type,
           isRecurring,
           recurrenceEndDate: isRecurring ? recurrenceEndDate : null,
         },
@@ -171,7 +176,8 @@ export class CreditCardPurchasesService {
   }
 
   /** Total spend per responsible for a card, over the same filters the extrato uses. Purchases
-   * with no responsible are grouped under a single `null` entry. Sorted by total, descending. */
+   * with no responsible are grouped under a single `null` entry. Credits (estornos) net against
+   * that responsible's purchases instead of inflating their total. Sorted by total, descending. */
   async responsiblesSummary(
     userId: string,
     cardId: string,
@@ -188,19 +194,39 @@ export class CreditCardPurchasesService {
     if (filters.categoryId) where.categoryId = filters.categoryId;
     if (filters.invoiceId) where.invoiceId = filters.invoiceId;
 
+    return this.netResponsiblesSummary(where);
+  }
+
+  /** Same breakdown as `responsiblesSummary`, but summed across every ACTIVE card the user owns —
+   * feeds the "Gastos por responsável" card on the credit-cards dashboard. Archived cards are
+   * excluded, matching `CreditCardsService.getSummary()`'s scope. */
+  async responsiblesSummaryAllCards(userId: string): Promise<ResponsibleSummaryItem[]> {
+    return this.netResponsiblesSummary({ userId, card: { status: CreditCardStatus.ACTIVE } });
+  }
+
+  /** Groups purchases by responsible (and type, to net credits/estornos against purchases) for
+   * whatever card scope `where` describes, and returns totals sorted descending. */
+  private async netResponsiblesSummary(
+    where: Prisma.CreditCardPurchaseWhereInput,
+  ): Promise<ResponsibleSummaryItem[]> {
     const grouped = await this.prisma.creditCardPurchase.groupBy({
-      by: ["responsibleName"],
+      by: ["responsibleName", "type"],
       where,
       _sum: { amount: true },
       _count: { _all: true },
     });
 
-    return grouped
-      .map((row) => ({
-        responsibleName: row.responsibleName,
-        total: Number(row._sum.amount ?? 0),
-        count: row._count._all,
-      }))
+    const byResponsible = new Map<string | null, { total: number; count: number }>();
+    for (const row of grouped) {
+      const entry = byResponsible.get(row.responsibleName) ?? { total: 0, count: 0 };
+      const amount = Number(row._sum.amount ?? 0);
+      entry.total += row.type === CardPurchaseType.CREDIT ? -amount : amount;
+      entry.count += row._count._all;
+      byResponsible.set(row.responsibleName, entry);
+    }
+
+    return [...byResponsible.entries()]
+      .map(([responsibleName, { total, count }]) => ({ responsibleName, total, count }))
       .sort((a, b) => b.total - a.total);
   }
 
@@ -238,6 +264,9 @@ export class CreditCardPurchasesService {
         throw new InvalidCreditCardPurchaseConfigException(
           "Uma compra parcelada não pode virar uma compra recorrente.",
         );
+      }
+      if (existing.type === CardPurchaseType.CREDIT) {
+        throw new InvalidCreditCardPurchaseConfigException("Um crédito não pode ser recorrente.");
       }
     }
     if (dto.categoryId) {
@@ -328,6 +357,7 @@ export class CreditCardPurchasesService {
     card: CreditCard,
     dto: CreateCreditCardPurchaseDto,
     totalInstallments: number,
+    type: CardPurchaseType,
   ): Promise<PublicPurchase> {
     const totalCents = Math.round(dto.amount * 100);
     const baseCents = Math.floor(totalCents / totalInstallments);
@@ -364,6 +394,7 @@ export class CreditCardPurchasesService {
             responsibleName: normalizeResponsibleName(dto.responsibleName),
             notes: dto.notes,
             source: CardPurchaseSource.MANUAL,
+            type,
             installmentGroupId,
             installmentNumber: index + 1,
             installmentTotal: totalInstallments,

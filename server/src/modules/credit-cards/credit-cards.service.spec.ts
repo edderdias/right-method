@@ -21,6 +21,7 @@ function createPrismaMock() {
     creditCardInvoice: {
       count: jest.fn(),
       aggregate: jest.fn().mockResolvedValue({ _sum: { totalAmount: null } }),
+      findMany: jest.fn().mockResolvedValue([]),
     },
     creditCardPurchase: {
       count: jest.fn(),
@@ -199,9 +200,15 @@ describe("CreditCardsService", () => {
           availableLimit: new Prisma.Decimal(500),
         }),
       ]);
-      prisma.creditCardInvoice.aggregate.mockResolvedValue({
-        _sum: { totalAmount: new Prisma.Decimal(350) },
-      });
+      prisma.creditCardInvoice.aggregate.mockImplementation((args: any) =>
+        Promise.resolve({
+          _sum: {
+            totalAmount: args?.where?.referenceMonth
+              ? new Prisma.Decimal(120)
+              : new Prisma.Decimal(350),
+          },
+        }),
+      );
 
       const summary = await service.getSummary("user-1");
 
@@ -211,7 +218,64 @@ describe("CreditCardsService", () => {
         totalAvailable: 1200,
         totalUsed: 300,
         openInvoicesTotal: 350,
+        currentMonthInvoicesTotal: 120,
       });
+    });
+
+    it("counts the current month's invoice even if it's already been paid, unlike openInvoicesTotal", async () => {
+      prisma.creditCard.findMany.mockResolvedValue([buildCard()]);
+      // Simulates the real bug: this month's invoice (130) is PAID, so it must be excluded from
+      // openInvoicesTotal (which only counts unpaid invoices) but still counted in
+      // currentMonthInvoicesTotal (which reports the month's bill regardless of payment status).
+      prisma.creditCardInvoice.aggregate.mockImplementation((args: any) =>
+        Promise.resolve({
+          _sum: {
+            totalAmount: args?.where?.referenceMonth
+              ? new Prisma.Decimal(130)
+              : new Prisma.Decimal(0),
+          },
+        }),
+      );
+
+      const summary = await service.getSummary("user-1");
+
+      expect(summary.currentMonthInvoicesTotal).toBe(130);
+      expect(summary.openInvoicesTotal).toBe(0);
+
+      const currentMonthCall = prisma.creditCardInvoice.aggregate.mock.calls.find(
+        (call: any) => call[0].where.referenceMonth,
+      );
+      expect(currentMonthCall[0].where.status).toBeUndefined();
+    });
+  });
+
+  describe("getCardsCurrentInvoices", () => {
+    it("returns each active card's current-cycle invoice total", async () => {
+      prisma.creditCardInvoice.findMany.mockResolvedValue([
+        { cardId: "card-1", totalAmount: new Prisma.Decimal(450) },
+        { cardId: "card-2", totalAmount: new Prisma.Decimal(0) },
+      ]);
+
+      const result = await service.getCardsCurrentInvoices("user-1");
+
+      expect(result).toEqual([
+        { cardId: "card-1", currentInvoiceTotal: 450 },
+        { cardId: "card-2", currentInvoiceTotal: 0 },
+      ]);
+      const where = prisma.creditCardInvoice.findMany.mock.calls[0][0].where;
+      expect(where).toMatchObject({
+        userId: "user-1",
+        card: { status: CreditCardStatus.ACTIVE },
+      });
+      expect(where.referenceMonth).toBeInstanceOf(Date);
+    });
+
+    it("omits cards with no invoice for the current month", async () => {
+      prisma.creditCardInvoice.findMany.mockResolvedValue([]);
+
+      const result = await service.getCardsCurrentInvoices("user-1");
+
+      expect(result).toEqual([]);
     });
   });
 });

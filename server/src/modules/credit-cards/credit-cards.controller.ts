@@ -48,6 +48,20 @@ export class CreditCardsController {
     return { message: "Resumo de cartões.", data };
   }
 
+  @Get("responsibles-summary")
+  @ApiOperation({ summary: "Total gasto por responsável, somando todos os cartões ativos" })
+  async responsiblesSummaryAllCards(@CurrentUser() user: JwtPayload) {
+    const data = await this.purchasesService.responsiblesSummaryAllCards(user.sub);
+    return { message: "Gastos por responsável em todos os cartões.", data };
+  }
+
+  @Get("current-invoices")
+  @ApiOperation({ summary: "Fatura do mês corrente de cada cartão ativo" })
+  async currentInvoices(@CurrentUser() user: JwtPayload) {
+    const data = await this.creditCardsService.getCardsCurrentInvoices(user.sub);
+    return { message: "Faturas do mês por cartão.", data };
+  }
+
   @Post()
   @ApiOperation({ summary: "Cadastra um cartão manual" })
   async create(@CurrentUser() user: JwtPayload, @Body() dto: CreateCreditCardDto) {

@@ -1,4 +1,4 @@
-import { CardPurchaseSource, CreditCardSource, Prisma } from "@prisma/client";
+import { CardPurchaseSource, CardPurchaseType, CreditCardSource, Prisma } from "@prisma/client";
 import {
   CreditCardPurchaseNotFoundException,
   CreditCardPurchaseReadOnlyException,
@@ -70,6 +70,7 @@ function buildPurchase(overrides: Record<string, unknown> = {}) {
     purchaseDate: new Date("2026-08-05T00:00:00.000Z"),
     categoryId: null,
     source: CardPurchaseSource.MANUAL,
+    type: CardPurchaseType.PURCHASE,
     installmentGroupId: null,
     installmentNumber: null,
     installmentTotal: null,
@@ -199,6 +200,67 @@ describe("CreditCardPurchasesService", () => {
       expect(where).toMatchObject({ userId: "user-1", cardId: "card-1" });
       expect(where.purchaseDate).toBeDefined();
     });
+
+    it("nets a responsible's credits (estornos) against their purchases", async () => {
+      prisma.creditCardPurchase.groupBy.mockResolvedValue([
+        {
+          responsibleName: "João",
+          type: CardPurchaseType.PURCHASE,
+          _sum: { amount: new Prisma.Decimal(500) },
+          _count: { _all: 2 },
+        },
+        {
+          responsibleName: "João",
+          type: CardPurchaseType.CREDIT,
+          _sum: { amount: new Prisma.Decimal(120) },
+          _count: { _all: 1 },
+        },
+      ]);
+
+      const result = await service.responsiblesSummary("user-1", "card-1", {});
+
+      expect(result).toEqual([{ responsibleName: "João", total: 380, count: 3 }]);
+    });
+  });
+
+  describe("responsiblesSummaryAllCards", () => {
+    it("scopes the groupBy to the user's active cards, without a cardId filter", async () => {
+      prisma.creditCardPurchase.groupBy.mockResolvedValue([
+        {
+          responsibleName: "Maria",
+          type: CardPurchaseType.PURCHASE,
+          _sum: { amount: new Prisma.Decimal(700) },
+          _count: { _all: 3 },
+        },
+      ]);
+
+      const result = await service.responsiblesSummaryAllCards("user-1");
+
+      expect(result).toEqual([{ responsibleName: "Maria", total: 700, count: 3 }]);
+      const where = prisma.creditCardPurchase.groupBy.mock.calls[0][0].where;
+      expect(where).toEqual({ userId: "user-1", card: { status: "ACTIVE" } });
+    });
+
+    it("nets credits against purchases across all cards combined", async () => {
+      prisma.creditCardPurchase.groupBy.mockResolvedValue([
+        {
+          responsibleName: "Maria",
+          type: CardPurchaseType.PURCHASE,
+          _sum: { amount: new Prisma.Decimal(500) },
+          _count: { _all: 2 },
+        },
+        {
+          responsibleName: "Maria",
+          type: CardPurchaseType.CREDIT,
+          _sum: { amount: new Prisma.Decimal(200) },
+          _count: { _all: 1 },
+        },
+      ]);
+
+      const result = await service.responsiblesSummaryAllCards("user-1");
+
+      expect(result).toEqual([{ responsibleName: "Maria", total: 300, count: 3 }]);
+    });
   });
 
   describe("create — installments", () => {
@@ -233,6 +295,69 @@ describe("CreditCardPurchasesService", () => {
       );
       expect(invoiceIds).toEqual(["inv-2026-08", "inv-2026-09", "inv-2026-10"]);
       expect(result.installmentNumber).toBe(1);
+    });
+  });
+
+  describe("create — credit (estorno)", () => {
+    it("tags a single credit entry with type CREDIT", async () => {
+      prisma.creditCardPurchase.create.mockImplementation(({ data }: any) =>
+        Promise.resolve(buildPurchase({ ...data })),
+      );
+
+      const result = await service.create("user-1", buildCard(), {
+        description: "Estorno - Blusa devolvida",
+        amount: 150,
+        purchaseDate: "2026-08-05",
+        type: CardPurchaseType.CREDIT,
+      } as any);
+
+      expect(prisma.creditCardPurchase.create.mock.calls[0][0].data.type).toBe(
+        CardPurchaseType.CREDIT,
+      );
+      expect(result.type).toBe(CardPurchaseType.CREDIT);
+    });
+
+    it("splits a credit across installments, tagging every installment as CREDIT", async () => {
+      prisma.creditCardPurchase.create.mockImplementation(({ data }: any) =>
+        Promise.resolve(buildPurchase({ ...data, id: `p-${data.installmentNumber}` })),
+      );
+
+      await service.create("user-1", buildCard(), {
+        description: "Estorno - Notebook devolvido",
+        amount: 900,
+        purchaseDate: "2026-08-05",
+        totalInstallments: 3,
+        type: CardPurchaseType.CREDIT,
+      } as any);
+
+      const types = prisma.creditCardPurchase.create.mock.calls.map(
+        (call: any) => call[0].data.type,
+      );
+      expect(types).toEqual([CardPurchaseType.CREDIT, CardPurchaseType.CREDIT, CardPurchaseType.CREDIT]);
+    });
+
+    it("rejects a credit that is also recurring", async () => {
+      await expect(
+        service.create("user-1", buildCard(), {
+          description: "Estorno",
+          amount: 100,
+          purchaseDate: "2026-08-05",
+          type: CardPurchaseType.CREDIT,
+          isRecurring: true,
+        } as any),
+      ).rejects.toBeInstanceOf(InvalidCreditCardPurchaseConfigException);
+      expect(prisma.creditCardPurchase.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects turning an existing credit entry recurring on update", async () => {
+      prisma.creditCardPurchase.findFirst.mockResolvedValue(
+        buildPurchase({ type: CardPurchaseType.CREDIT }),
+      );
+
+      await expect(
+        service.update("user-1", "purchase-1", { isRecurring: true } as any),
+      ).rejects.toBeInstanceOf(InvalidCreditCardPurchaseConfigException);
+      expect(prisma.creditCardPurchase.update).not.toHaveBeenCalled();
     });
   });
 

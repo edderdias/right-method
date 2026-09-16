@@ -105,6 +105,11 @@ enum CardPurchaseSource {
   OPEN_FINANCE
 }
 
+enum CardPurchaseType {
+  PURCHASE
+  CREDIT
+}
+
 enum InvestmentType {
   RENDA_FIXA
   ACOES
@@ -684,6 +689,7 @@ model CreditCardPurchase {
   categoryId            String?
   responsibleName       String?
   source                CardPurchaseSource @default(MANUAL)
+  type                  CardPurchaseType   @default(PURCHASE)
   installmentGroupId    String?
   installmentNumber     Int?
   installmentTotal      Int?

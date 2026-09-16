@@ -6,7 +6,9 @@ import {
   addOpenFinanceCreditCard,
   createCreditCard,
   createCreditCardPurchase,
+  getAllCardsResponsiblesSummary,
   getCardResponsiblesSummary,
+  getCardsCurrentInvoices,
   getCardResponsibleSuggestions,
   getCreditCard,
   getCreditCardInvoice,
@@ -38,6 +40,8 @@ import type {
 export const creditCardKeys = {
   all: ["credit-cards"] as const,
   summary: ["credit-cards", "summary"] as const,
+  allResponsiblesSummary: ["credit-cards", "responsibles-summary"] as const,
+  currentInvoices: ["credit-cards", "current-invoices"] as const,
   card: (id: string) => ["credit-cards", id] as const,
   purchases: (cardId: string, filters: CreditCardPurchaseFilters) =>
     ["credit-cards", cardId, "purchases", filters] as const,
@@ -65,6 +69,20 @@ export function useCreditCards() {
 
 export function useCreditCardsSummary() {
   return useQuery({ queryKey: creditCardKeys.summary, queryFn: getCreditCardsSummary });
+}
+
+export function useAllCardsResponsiblesSummary() {
+  return useQuery({
+    queryKey: creditCardKeys.allResponsiblesSummary,
+    queryFn: getAllCardsResponsiblesSummary,
+  });
+}
+
+export function useCardsCurrentInvoices() {
+  return useQuery({
+    queryKey: creditCardKeys.currentInvoices,
+    queryFn: getCardsCurrentInvoices,
+  });
 }
 
 export function useCreditCard(id: string) {
@@ -126,6 +144,8 @@ export function useAvailableOpenFinanceCards(connectionId: string) {
 function invalidateCardAndSummary(queryClient: ReturnType<typeof useQueryClient>, cardId?: string) {
   void queryClient.invalidateQueries({ queryKey: creditCardKeys.all });
   void queryClient.invalidateQueries({ queryKey: creditCardKeys.summary });
+  void queryClient.invalidateQueries({ queryKey: creditCardKeys.allResponsiblesSummary });
+  void queryClient.invalidateQueries({ queryKey: creditCardKeys.currentInvoices });
   if (cardId) {
     void queryClient.invalidateQueries({ queryKey: creditCardKeys.card(cardId) });
   }
