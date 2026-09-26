@@ -34,9 +34,13 @@ async function bootstrap(): Promise<void> {
   SwaggerModule.setup("docs", app, document);
 
   const port = config.get("PORT");
-  await app.listen(port);
+  await app.listen(port, "0.0.0.0");
   // eslint-disable-next-line no-console
-  console.log(`Auth API listening on http://localhost:${port}/api (docs at /docs)`);
+  console.log(`Auth API listening on http://0.0.0.0:${port}/api (docs at /docs)`);
 }
 
-void bootstrap();
+bootstrap().catch((err) => {
+  // eslint-disable-next-line no-console
+  console.error("Fatal error during bootstrap:", err);
+  process.exit(1);
+});
