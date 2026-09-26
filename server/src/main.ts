@@ -10,8 +10,23 @@ async function bootstrap(): Promise<void> {
   const config = app.get(AppConfigService);
 
   app.setGlobalPrefix("api");
+
+  const rawFrontendUrl = config.get("FRONTEND_URL");
+  const normalizedFrontendUrl = rawFrontendUrl.replace(/\/+$/, "");
+
   app.enableCors({
-    origin: config.get("FRONTEND_URL"),
+    origin: (requestOrigin, callback) => {
+      if (!requestOrigin) return callback(null, true);
+      const cleanOrigin = requestOrigin.replace(/\/+$/, "");
+      if (
+        cleanOrigin === normalizedFrontendUrl ||
+        cleanOrigin === "http://localhost:5173" ||
+        cleanOrigin === "http://localhost:3000"
+      ) {
+        return callback(null, true);
+      }
+      return callback(new Error(`Blocked by CORS: ${requestOrigin}`), false);
+    },
     credentials: true,
   });
   app.useGlobalPipes(
