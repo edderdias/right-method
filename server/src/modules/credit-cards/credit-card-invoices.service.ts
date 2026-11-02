@@ -49,15 +49,12 @@ export class CreditCardInvoicesService {
   ) {}
 
   /** Given the card's closing/due day, decides which monthly invoice cycle a purchase date falls
-   * into. When the due day is in the same month as the closing day (closingDay < dueDay, e.g.
-   * closes the 4th and is due the 10th), a purchase strictly before the closing day is the current
-   * cycle and one on/after the closing day rolls to next month's invoice (spec section 29) — e.g.
-   * closing day 4 sends a purchase dated the 4th to next month's invoice, not the current one. When
-   * the due day rolls into the following month instead (closingDay > dueDay, e.g. closes the 28th
-   * and is due the 12th), the closing day itself is still the last day of the current cycle — only
-   * a purchase strictly after it rolls forward, e.g. a purchase on the 28th still closes on the
-   * 28th, and only one dated the 29th rolls into the invoice that closes next month. Falls back to
-   * sane defaults for Open Finance cards whose provider hasn't reported a cycle yet. */
+   * into. The closing day is the first day of the new cycle: a purchase strictly before it belongs
+   * to the invoice closing this month, and one on/after it rolls to next month's invoice (spec
+   * section 29) — e.g. closing day 29 puts everything from 10/29 through 11/28 on the invoice that
+   * closes 11/29, and a purchase dated 11/29 already goes to the following one. This holds
+   * regardless of the due day. Falls back to sane defaults for Open Finance cards whose provider
+   * hasn't reported a cycle yet. */
   resolveCycle(
     card: { closingDay: number | null; dueDay: number | null },
     purchaseDate: Date,
@@ -65,7 +62,7 @@ export class CreditCardInvoicesService {
     const closingDay = card.closingDay ?? DEFAULT_CLOSING_DAY;
     const dueDay = card.dueDay ?? DEFAULT_DUE_DAY;
     const day = purchaseDate.getUTCDate();
-    const rollsToNextCycle = closingDay > dueDay ? day > closingDay : day >= closingDay;
+    const rollsToNextCycle = day >= closingDay;
 
     let cycleMonth = new Date(
       Date.UTC(purchaseDate.getUTCFullYear(), purchaseDate.getUTCMonth(), 1),

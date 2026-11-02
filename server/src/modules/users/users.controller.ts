@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, Patch, Post } from "@nestjs/common";
 import { ApiBearerAuth, ApiOperation, ApiTags } from "@nestjs/swagger";
 import type { RegistrationResponseJSON } from "@simplewebauthn/server";
 import { CurrentUser } from "../../common/decorators/current-user.decorator";
@@ -10,6 +10,8 @@ import {
 import { UsersService } from "./users.service";
 import { TwoFactorService } from "./two-factor.service";
 import { WebAuthnService } from "./webauthn.service";
+import { UsersDataService } from "./users-data.service";
+import { ResetDataDto } from "./dto/reset-data.dto";
 import { SetAiCredentialsDto } from "./dto/set-ai-credentials.dto";
 import { SetPluggyCredentialsDto } from "./dto/set-pluggy-credentials.dto";
 import { UpdateProfileDto } from "./dto/update-profile.dto";
@@ -25,6 +27,7 @@ export class UsersController {
     private readonly usersService: UsersService,
     private readonly twoFactorService: TwoFactorService,
     private readonly webAuthnService: WebAuthnService,
+    private readonly usersDataService: UsersDataService,
   ) {}
 
   @Patch()
@@ -58,6 +61,21 @@ export class UsersController {
       message: "Preferências de segurança atualizadas.",
       data: this.usersService.toPublic(updated),
     };
+  }
+
+  @Get("backup")
+  @ApiOperation({ summary: "Gera um backup (JSON) de todos os dados financeiros do usuário" })
+  async backup(@CurrentUser() user: JwtPayload) {
+    const data = await this.usersDataService.exportBackup(user.sub);
+    return { message: "Backup gerado com sucesso.", data };
+  }
+
+  @Post("reset-data")
+  @HttpCode(200)
+  @ApiOperation({ summary: "Apaga todos os dados do usuário, mantendo apenas a conta" })
+  async resetData(@CurrentUser() user: JwtPayload, @Body() dto: ResetDataDto) {
+    await this.usersDataService.resetData(user.sub, dto.confirmation);
+    return { message: "Todos os dados foram apagados.", data: { reset: true } };
   }
 
   @Get("ai-credentials")

@@ -4,9 +4,11 @@ import { toast } from "sonner";
 import { ApiError } from "@/lib/api-client";
 import {
   changePassword,
+  downloadBackup,
   getCurrentUser,
   getPluggyCredentialsStatus,
   removePluggyCredentials,
+  resetAllData,
   savePluggyCredentials,
   updateNotificationPreferences,
   updateProfile,
@@ -91,6 +93,37 @@ export function useRemovePluggyCredentials() {
       queryClient.setQueryData(pluggyCredentialsStatusKey, data);
       void queryClient.invalidateQueries({ queryKey: currentUserKey });
       toast.success("Credenciais do Pluggy removidas.");
+    },
+    onError: (error) => toast.error(toErrorMessage(error)),
+  });
+}
+
+export function useDownloadBackup() {
+  return useMutation({
+    mutationFn: downloadBackup,
+    onSuccess: (backup) => {
+      const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `metodo-certo-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast.success("Backup gerado e baixado com sucesso.");
+    },
+    onError: (error) => toast.error(toErrorMessage(error)),
+  });
+}
+
+export function useResetAllData() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (confirmation: string) => resetAllData(confirmation),
+    onSuccess: () => {
+      void queryClient.invalidateQueries();
+      toast.success("Todos os dados foram apagados.");
     },
     onError: (error) => toast.error(toErrorMessage(error)),
   });

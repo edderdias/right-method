@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import {
   Bell,
   Copy,
+  Database,
+  Download,
   Eye,
   EyeOff,
   Fingerprint,
@@ -19,6 +21,7 @@ import {
   Smartphone,
   Sparkles,
   Sun,
+  Trash2,
   User,
   UserPlus,
   Users,
@@ -72,8 +75,10 @@ import { useDisableBiometric, useEnableBiometric } from "@/hooks/use-webauthn";
 import {
   useChangePassword,
   useCurrentUser,
+  useDownloadBackup,
   usePluggyCredentialsStatus,
   useRemovePluggyCredentials,
+  useResetAllData,
   useSavePluggyCredentials,
   useUpdateNotificationPreferences,
   useUpdateProfile,
@@ -81,6 +86,7 @@ import {
 } from "@/hooks/use-user-settings";
 import { ApiError } from "@/lib/api-client";
 import { logoutAllSessions } from "@/lib/auth";
+import { RESET_DATA_CONFIRMATION_PHRASE } from "@/lib/users-api";
 import { formatDateTime } from "@/lib/finance-format";
 import { cn } from "@/lib/utils";
 import type { AiProvider, NotificationPreferences, SecurityPreferences } from "@/types/user";
@@ -252,6 +258,21 @@ function ConfiguracoesPage() {
         },
       },
     );
+  }
+
+  const downloadBackupMutation = useDownloadBackup();
+  const resetDataMutation = useResetAllData();
+  const [resetDialogOpen, setResetDialogOpen] = useState(false);
+  const [resetPhrase, setResetPhrase] = useState("");
+  const resetPhraseMatches = resetPhrase.trim() === RESET_DATA_CONFIRMATION_PHRASE;
+
+  function handleResetData() {
+    resetDataMutation.mutate(resetPhrase.trim(), {
+      onSuccess: () => {
+        setResetDialogOpen(false);
+        setResetPhrase("");
+      },
+    });
   }
 
   const [loggingOutAll, setLoggingOutAll] = useState(false);
@@ -970,6 +991,92 @@ function ConfiguracoesPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Card className="rounded-3xl border-border/70 shadow-soft">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Database className="size-4 text-primary" aria-hidden="true" />
+            Dados e backup
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-4 lg:grid-cols-2">
+          <div className="space-y-3 rounded-2xl bg-surface-2 p-4">
+            <div>
+              <p className="text-sm font-medium">Gerar backup</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Baixe um arquivo JSON com todas as suas contas, lançamentos, cartões, investimentos
+                e metas. Senhas e chaves não são incluídas.
+              </p>
+            </div>
+            <Button
+              variant="secondary"
+              className="rounded-xl"
+              onClick={() => downloadBackupMutation.mutate()}
+              disabled={downloadBackupMutation.isPending}
+            >
+              <Download className="size-4" aria-hidden="true" />
+              {downloadBackupMutation.isPending ? "Gerando..." : "Baixar backup"}
+            </Button>
+          </div>
+          <div className="space-y-3 rounded-2xl border border-destructive/30 bg-destructive/5 p-4">
+            <div>
+              <p className="text-sm font-medium text-destructive">Zerar dados</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Apaga contas, receitas, despesas, cartões, investimentos, metas e conversas da IA.
+                Seu usuário e login são mantidos. Esta ação não pode ser desfeita — gere um backup
+                antes.
+              </p>
+            </div>
+            <Button
+              variant="destructive"
+              className="rounded-xl"
+              onClick={() => setResetDialogOpen(true)}
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Zerar banco de dados
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={resetDialogOpen}
+        onOpenChange={(open) => {
+          setResetDialogOpen(open);
+          if (!open) setResetPhrase("");
+        }}
+      >
+        <DialogContent className="rounded-3xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Zerar todos os dados?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Todos os seus dados financeiros serão apagados permanentemente. Para confirmar,
+              digite <span className="font-mono font-semibold">{RESET_DATA_CONFIRMATION_PHRASE}</span>{" "}
+              abaixo.
+            </p>
+            <Input
+              value={resetPhrase}
+              onChange={(e) => setResetPhrase(e.target.value)}
+              placeholder={RESET_DATA_CONFIRMATION_PHRASE}
+              autoComplete="off"
+              className="h-11 rounded-xl font-mono"
+              aria-label="Frase de confirmação"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              variant="destructive"
+              className="w-full rounded-xl"
+              onClick={handleResetData}
+              disabled={resetDataMutation.isPending || !resetPhraseMatches}
+            >
+              {resetDataMutation.isPending ? "Apagando..." : "Apagar tudo definitivamente"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
         <DialogContent className="rounded-3xl sm:max-w-md">
