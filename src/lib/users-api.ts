@@ -1,4 +1,4 @@
-import { apiDelete, apiGet, apiPatch } from "@/lib/api-client";
+import { apiDelete, apiGet, apiPatch, apiPost } from "@/lib/api-client";
 import type {
   NotificationPreferences,
   SecurityPreferences,
@@ -58,6 +58,17 @@ export async function removePluggyCredentials(): Promise<{ hasCredentials: boole
     "/users/me/pluggy-credentials",
   );
   return data;
+}
+
+export const RESET_DATA_CONFIRMATION_PHRASE = "ZERAR MEUS DADOS";
+
+export async function downloadBackup(): Promise<Record<string, unknown>> {
+  const { data } = await apiGet<ApiEnvelope<Record<string, unknown>>>("/users/me/backup");
+  return data;
+}
+
+export async function resetAllData(confirmation: string): Promise<void> {
+  await apiPost<ApiEnvelope<{ reset: boolean }>>("/users/me/reset-data", { confirmation });
 }
 
 export async function changePassword(

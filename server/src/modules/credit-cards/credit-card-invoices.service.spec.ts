@@ -112,22 +112,27 @@ describe("CreditCardInvoicesService", () => {
       expect(cycle.dueDate.toISOString().slice(0, 10)).toBe("2026-09-05");
     });
 
-    it("keeps a purchase dated exactly on the closing day in the current cycle when closingDay is after dueDay", () => {
+    it("keeps a purchase the day before closing in the current cycle when closingDay is after dueDay", () => {
       const cycle = service.resolveCycle(
-        { closingDay: 28, dueDay: 12 },
-        new Date("2026-09-28T00:00:00.000Z"),
+        { closingDay: 29, dueDay: 12 },
+        new Date("2026-11-28T00:00:00.000Z"),
       );
-      expect(cycle.closingDate.toISOString().slice(0, 10)).toBe("2026-09-28");
-      expect(cycle.dueDate.toISOString().slice(0, 10)).toBe("2026-10-12");
+      expect(cycle.closingDate.toISOString().slice(0, 10)).toBe("2026-11-29");
+      expect(cycle.dueDate.toISOString().slice(0, 10)).toBe("2026-12-12");
     });
 
-    it("rolls a purchase dated the day after closing into next month's cycle when closingDay is after dueDay", () => {
-      const cycle = service.resolveCycle(
-        { closingDay: 28, dueDay: 12 },
-        new Date("2026-09-29T00:00:00.000Z"),
+    it("starts a new cycle on the closing day itself when closingDay is after dueDay", () => {
+      const open = service.resolveCycle(
+        { closingDay: 29, dueDay: 12 },
+        new Date("2026-10-29T00:00:00.000Z"),
       );
-      expect(cycle.closingDate.toISOString().slice(0, 10)).toBe("2026-10-28");
-      expect(cycle.dueDate.toISOString().slice(0, 10)).toBe("2026-11-12");
+      expect(open.closingDate.toISOString().slice(0, 10)).toBe("2026-11-29");
+      const next = service.resolveCycle(
+        { closingDay: 29, dueDay: 12 },
+        new Date("2026-11-29T00:00:00.000Z"),
+      );
+      expect(next.closingDate.toISOString().slice(0, 10)).toBe("2026-12-29");
+      expect(next.dueDate.toISOString().slice(0, 10)).toBe("2027-01-12");
     });
 
     it("falls back to sane defaults when the card has no closing/due day configured yet", () => {
